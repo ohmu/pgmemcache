@@ -1,6 +1,8 @@
 /*
  * PostgreSQL functions to interface with memcache.
  *
+ * $PostgreSQL$
+ *
  * Copyright (c) 2004 Sean Chittenden <sean@chittenden.org>
  *
  * Permission is hereby granted, free of charge, to any person
@@ -37,34 +39,35 @@
 
 /* Global memcache instance. */
 static struct memcache *mc = NULL;
+static struct memcache_ctxt *ctxt = NULL;
 
 /* Add a small work around function to compensate for PostgreSQLs lack
  * of a pstrdup(3) function that allocates memory from the upper
  * layer's SPI context. */
-static void	 mc_pfree(void *ptr);
-static void	*mc_palloc(const size_t size);
-static void	*mc_repalloc(void *ptr, const size_t size);
-static char	*mc_pstrdup(const char *str);
-static bool	 _memcache_init(void);
-static Datum	 memcache_atomic_op(int type, PG_FUNCTION_ARGS);
-static Datum	 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
+inline static void	 mcm_pfree(void *ptr);
+inline static void	*mcm_palloc(const size_t size);
+inline static void	*mcm_repalloc(void *ptr, const size_t size);
+inline static char	*mcm_pstrdup(const char *str);
+static bool		 _memcache_init(void);
+static Datum		 memcache_atomic_op(int type, PG_FUNCTION_ARGS);
+static Datum		 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 
-#define MC_SET_CMD_TYPE_ADD 0x0001
-#define MC_SET_CMD_TYPE_REPLACE 0x0002
-#define MC_SET_CMD_TYPE_SET 0x0004
+#define MCM_SET_CMD_TYPE_ADD 0x0001
+#define MCM_SET_CMD_TYPE_REPLACE 0x0002
+#define MCM_SET_CMD_TYPE_SET 0x0004
 
-#define MC_DATE_TYPE_INTERVAL 0x0010
-#define MC_DATE_TYPE_TIMESTAMP 0x0020
+#define MCM_DATE_TYPE_INTERVAL 0x0010
+#define MCM_DATE_TYPE_TIMESTAMP 0x0020
 
-#define MC_ATOMIC_TYPE_DECR 0x0040
-#define MC_ATOMIC_TYPE_INCR 0x0080
+#define MCM_ATOMIC_TYPE_DECR 0x0040
+#define MCM_ATOMIC_TYPE_INCR 0x0080
 
 /* Don't add a server until a caller has called memcache_init().  This
  * is probably an unnecessary degree of explicitness, but it forces
  * good calling conventions for pgmemcache.  */
-#define MC_CHECK(_ret) do { \
-  if (mc == NULL) { \
-    elog(WARNING, "%s(): mc is NULL, call memcache_init()", __FUNCTION__); \
+#define MCM_CHECK(_ret) do { \
+  if (mc == NULL || ctxt == NULL) { \
+    elog(ERROR, "%s(): mc is NULL, call memcache_init()", __FUNCTION__); \
     _ret; \
   } \
 } while(0)
@@ -74,39 +77,39 @@ static Datum	 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
  * They exist, but are macros, which is useless with regards to
  * function pointers if the macro doesn't have the same signature.
  * Create that signature here. */
-static void
-mc_pfree(void *ptr) {
+inline static void
+mcm_pfree(void *ptr) {
   return pfree(ptr);
 }
 
 
-static void *
-mc_palloc(const size_t size) {
+inline static void *
+mcm_palloc(const size_t size) {
   return palloc(size);
 }
 
 
-static void *
-mc_repalloc(void *ptr, const size_t size) {
+inline static void *
+mcm_repalloc(void *ptr, const size_t size) {
   return repalloc(ptr, size);
 }
 
 
-static char *
-mc_pstrdup(const char *str) {
+inline static char *
+mcm_pstrdup(const char *str) {
   return pstrdup(str);
 }
 
 
 Datum
 memcache_add(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_ADD | MC_DATE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_ADD | MCM_DATE_TYPE_INTERVAL, fcinfo);
 }
 
 
 Datum
 memcache_add_absexpire(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_ADD | MC_DATE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_ADD | MCM_DATE_TYPE_TIMESTAMP, fcinfo);
 }
 
 
@@ -114,9 +117,10 @@ static Datum
 memcache_atomic_op(int type, PG_FUNCTION_ARGS) {
   text		*key;
   size_t	 key_len;
-  u_int32_t	 val, ret;
+  u_int32_t	 val,
+		 ret = 0;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
@@ -130,10 +134,10 @@ memcache_atomic_op(int type, PG_FUNCTION_ARGS) {
     val = PG_GETARG_UINT32(1);
   }
 
-  if (type & MC_ATOMIC_TYPE_DECR)
-    ret = mc_decr(mc, VARDATA(key), key_len, val);
-  else if (type & MC_ATOMIC_TYPE_INCR)
-    ret = mc_incr(mc, VARDATA(key), key_len, val);
+  if (type & MCM_ATOMIC_TYPE_DECR)
+    ret = mcm_decr(ctxt, mc, VARDATA(key), key_len, val);
+  else if (type & MCM_ATOMIC_TYPE_INCR)
+    ret = mcm_incr(ctxt, mc, VARDATA(key), key_len, val);
   else
     elog(ERROR, "%s():%s:%u\tunknown atomic type 0x%x", __FUNCTION__, __FILE__, __LINE__, type);
 
@@ -145,7 +149,7 @@ memcache_atomic_op(int type, PG_FUNCTION_ARGS) {
 
 Datum
 memcache_decr(PG_FUNCTION_ARGS) {
-  return memcache_atomic_op(MC_ATOMIC_TYPE_DECR, fcinfo);
+  return memcache_atomic_op(MCM_ATOMIC_TYPE_DECR, fcinfo);
 }
 
 
@@ -157,7 +161,7 @@ memcache_delete(PG_FUNCTION_ARGS) {
   float8	 hold;
   int		 ret;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
@@ -181,7 +185,7 @@ memcache_delete(PG_FUNCTION_ARGS) {
     }
   }
 
-  ret = mc_delete(mc, VARDATA(key), key_len, (time_t)hold);
+  ret = mcm_delete(ctxt, mc, VARDATA(key), key_len, (time_t)hold);
 
   SPI_finish();
 
@@ -202,7 +206,7 @@ memcache_flush_all(PG_FUNCTION_ARGS) {
   size_t	 key_len;
   int		 ret;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
@@ -211,7 +215,7 @@ memcache_flush_all(PG_FUNCTION_ARGS) {
   if (key_len < 1)
     elog(ERROR, "Unable to have a zero length key");
 
-  ret = mc_flush_all(mc, VARDATA(key), key_len);
+  ret = mcm_flush_all(ctxt, mc, VARDATA(key), key_len);
 
   SPI_finish();
 
@@ -228,12 +232,15 @@ memcache_flush_all(PG_FUNCTION_ARGS) {
 
 Datum
 memcache_free(PG_FUNCTION_ARGS) {
-  MC_CHECK(PG_RETURN_BOOL(false));
+  MCM_CHECK(PG_RETURN_BOOL(false));
 
   SPI_connect();
 
-  mc_free(mc);
+  mcm_free(ctxt, mc);
   mc = NULL;
+
+  mcMemFreeCtxt(ctxt);
+  ctxt = NULL;
 
   SPI_finish();
 
@@ -249,7 +256,7 @@ memcache_get(PG_FUNCTION_ARGS) {
   struct memcache_req	*req;
   struct memcache_res	*res;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
@@ -258,17 +265,17 @@ memcache_get(PG_FUNCTION_ARGS) {
   if (key_len < 1)
     elog(ERROR, "Unable to have a zero length key");
 
-  req = mc_req_new();
+  req = mcm_req_new(ctxt);
   if (req == NULL)
     elog(ERROR, "Unable to create a new memcache request structure");
 
-  res = mc_req_add(req, VARDATA(key), key_len);
+  res = mcm_req_add(ctxt, req, VARDATA(key), key_len);
   if (res == NULL)
     elog(ERROR, "Unable to create a new memcache responose structure");
 
-  mc_get(mc, req);
+  mcm_get(ctxt, mc, req);
 
-  if (!(res->_flags & MC_RES_FOUND)) {
+  if (!(res->_flags & MCM_RES_FOUND)) {
     SPI_finish();
     PG_RETURN_NULL();
   }
@@ -296,7 +303,7 @@ memcache_hash(PG_FUNCTION_ARGS) {
   if (key_len < 1)
     elog(ERROR, "Unable to have a zero length key");
 
-  hash = mc_hash_key(VARDATA(key), key_len);
+  hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
 
   SPI_finish();
 
@@ -306,7 +313,7 @@ memcache_hash(PG_FUNCTION_ARGS) {
 
 Datum
 memcache_incr(PG_FUNCTION_ARGS) {
-  return memcache_atomic_op(MC_ATOMIC_TYPE_INCR, fcinfo);
+  return memcache_atomic_op(MCM_ATOMIC_TYPE_INCR, fcinfo);
 }
 
 
@@ -329,16 +336,16 @@ _memcache_init(void) {
 
   /* Return FALSE that way callers can conditionally add servers to
    * the instance. */
-  if (mc != NULL)
+  if (ctxt != NULL)
     return false;
 
   /* Make sure mc is allocated in the top memory context */
   oc = MemoryContextSwitchTo(TopMemoryContext);
 
   /* Initialize libmemcache's memory functions */
-  mcMemSetup(mc_pfree, mc_palloc, mc_repalloc, mc_pstrdup);
+  ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc, mcm_pstrdup);
 
-  mc = mc_new();
+  mc = mcm_new(ctxt);
   if (mc == NULL)
     elog(ERROR, "memcache_init: unable to allocate memory");
 
@@ -351,25 +358,25 @@ _memcache_init(void) {
 
 Datum
 memcache_replace(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_REPLACE | MC_DATE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_REPLACE | MCM_DATE_TYPE_INTERVAL, fcinfo);
 }
 
 
 Datum
 memcache_replace_absexpire(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_REPLACE | MC_DATE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_REPLACE | MCM_DATE_TYPE_TIMESTAMP, fcinfo);
 }
 
 
 Datum
 memcache_set(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_SET | MC_DATE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_SET | MCM_DATE_TYPE_INTERVAL, fcinfo);
 }
 
 
 Datum
 memcache_set_absexpire(PG_FUNCTION_ARGS) {
-  return memcache_set_cmd(MC_SET_CMD_TYPE_SET | MC_DATE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(MCM_SET_CMD_TYPE_SET | MCM_DATE_TYPE_TIMESTAMP, fcinfo);
 }
 
 
@@ -385,9 +392,9 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
   struct pg_tm	 tm;
   fsec_t	 fsec;
   u_int16_t	 flags;
-  int		 ret;
+  int		 ret = 0;
 
-  MC_CHECK(PG_RETURN_BOOL(false));
+  MCM_CHECK(PG_RETURN_BOOL(false));
 
   SPI_connect();
 
@@ -411,7 +418,7 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
 
   expire = 0.0;
   if (fcinfo->arg[2] != NULL && !PG_ARGISNULL(2)) {
-    if (type & MC_DATE_TYPE_INTERVAL) {
+    if (type & MCM_DATE_TYPE_INTERVAL) {
       span = PG_GETARG_INTERVAL_P(2);
 #ifdef HAVE_INT64_TIMESTAMP
       expire = (span->time / 1000000e0);
@@ -422,7 +429,7 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
 	expire += ((365.25 * 86400) * (span->month / 12));
 	expire += ((30.0 * 86400) * (span->month % 12));
       }
-    } else if (type & MC_DATE_TYPE_TIMESTAMP) {
+    } else if (type & MCM_DATE_TYPE_TIMESTAMP) {
       timestamptz = PG_GETARG_TIMESTAMPTZ(2);
 
       /* convert to timestamptz to produce consistent results */
@@ -444,12 +451,12 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
   if (fcinfo->arg[3] != NULL && !PG_ARGISNULL(3))
     flags = PG_GETARG_INT16(3);
 
-  if (type & MC_SET_CMD_TYPE_ADD)
-    ret = mc_add(mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
-  else if (type & MC_SET_CMD_TYPE_REPLACE)
-    ret = mc_add(mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
-  else if (type & MC_SET_CMD_TYPE_SET)
-    ret = mc_add(mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
+  if (type & MCM_SET_CMD_TYPE_ADD)
+    ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
+  else if (type & MCM_SET_CMD_TYPE_REPLACE)
+    ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
+  else if (type & MCM_SET_CMD_TYPE_SET)
+    ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
   else
     elog(ERROR, "%s():%s:%u\tunknown set type 0x%x", __FUNCTION__, __FILE__, __LINE__, type);
 
@@ -472,7 +479,7 @@ memcache_server_add(PG_FUNCTION_ARGS) {
   int ret;
   MemoryContext oc;
 
-  MC_CHECK(PG_RETURN_BOOL(false));
+  MCM_CHECK(PG_RETURN_BOOL(false));
 
   SPI_connect();
 
@@ -485,7 +492,7 @@ memcache_server_add(PG_FUNCTION_ARGS) {
   elog(DEBUG1, "%s(): host=\"%.*s\" port=\"%.*s\"", __FUNCTION__, VARSIZE(server) - VARHDRSZ, VARDATA(server), VARSIZE(port) - VARHDRSZ, VARDATA(port));
 
   /* Add the server and port */
-  ret = mc_server_add2(mc, VARDATA(server), VARSIZE(server) - VARHDRSZ, VARDATA(port), VARSIZE(port) - VARHDRSZ);
+  ret = mcm_server_add2(ctxt, mc, VARDATA(server), VARSIZE(server) - VARHDRSZ, VARDATA(port), VARSIZE(port) - VARHDRSZ);
   if (ret < 0) {
     elog(NOTICE, "%s(): libmemcache unable to add server: %d", __FUNCTION__, ret);
     MemoryContextSwitchTo(oc);
@@ -508,11 +515,11 @@ memcache_stats(PG_FUNCTION_ARGS) {
   text		*ret;
   StringInfo	 str;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
-  stats = mc_stats(mc);
+  stats = mcm_stats(ctxt, mc);
   if (stats == NULL)
     elog(ERROR, "Unable to create a new memcache stats structure");
 
@@ -557,7 +564,7 @@ memcache_stat(PG_FUNCTION_ARGS) {
   size_t	 stat_len;
   StringInfo	 str;
 
-  MC_CHECK(PG_RETURN_NULL());
+  MCM_CHECK(PG_RETURN_NULL());
 
   SPI_connect();
 
@@ -566,7 +573,7 @@ memcache_stat(PG_FUNCTION_ARGS) {
   if (stat_len < 1)
     elog(ERROR, "Unable to have a zero length stat");
 
-  stats = mc_stats(mc);
+  stats = mcm_stats(ctxt, mc);
   if (stats == NULL)
     elog(ERROR, "Unable to create a new memcache stats structure");
 
