@@ -1,3 +1,4 @@
+
 /*
  * PostgreSQL functions to interface with memcache.
  *
@@ -44,8 +45,11 @@ PG_FUNCTION_INFO_V1(memcache_decr);
 Datum memcache_delete(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_delete);
 
-Datum memcache_flush_all(PG_FUNCTION_ARGS);
-PG_FUNCTION_INFO_V1(memcache_flush_all);
+Datum memcache_flush(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_flush);
+
+Datum memcache_flush_all0(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_flush_all0);
 
 Datum memcache_free(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_free);
@@ -79,5 +83,12 @@ Datum memcache_stats(PG_FUNCTION_ARGS);
 Datum memcache_stat(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_stats);
 PG_FUNCTION_INFO_V1(memcache_stat);
+
+
+/* DEPRECIATED INTERFACES */
+
+/* Use memcache_flush() */
+Datum memcache_flush_all(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_flush_all);
 
 #endif
