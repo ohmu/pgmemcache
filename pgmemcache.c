@@ -42,12 +42,10 @@ static struct memcache *mc = NULL;
 static struct memcache_ctxt *ctxt = NULL;
 
 /* Add a small work around function to compensate for PostgreSQLs lack
- * of a pstrdup(3) function that allocates memory from the upper
- * layer's SPI context. */
+ * of actual memory functions: PostgreSQL supplies macros instead. */
 inline static void	 mcm_pfree(void *ptr);
 inline static void	*mcm_palloc(const size_t size);
 inline static void	*mcm_repalloc(void *ptr, const size_t size);
-inline static char	*mcm_pstrdup(const char *str);
 static bool		 _memcache_init(void);
 static Datum		 memcache_atomic_op(int type, PG_FUNCTION_ARGS);
 static text		*memcache_gen_host(const struct memcache_server *ms);
@@ -74,10 +72,10 @@ static Datum		 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 } while(0)
 
 /* Add a small work around function to compensate for PostgreSQLs lack
- * of a pstrdup(3), palloc(3), pfree(3), and prealloc(3) functions.
- * They exist, but are macros, which is useless with regards to
- * function pointers if the macro doesn't have the same signature.
- * Create that signature here. */
+ * of a palloc(3), pfree(3), and prealloc(3) functions.  They exist,
+ * but are macros, which is useless with regards to function pointers
+ * if the macro doesn't have the same signature.  Create that
+ * signature here. */
 inline static void
 mcm_pfree(void *ptr) {
   return pfree(ptr);
@@ -93,12 +91,6 @@ mcm_palloc(const size_t size) {
 inline static void *
 mcm_repalloc(void *ptr, const size_t size) {
   return repalloc(ptr, size);
-}
-
-
-inline static char *
-mcm_pstrdup(const char *str) {
-  return pstrdup(str);
 }
 
 
@@ -386,7 +378,7 @@ _memcache_init(void) {
   oc = MemoryContextSwitchTo(TopMemoryContext);
 
   /* Initialize libmemcache's memory functions */
-  ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc, mcm_pstrdup);
+  ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc);
   if (ctxt == NULL)
     elog(ERROR, "memcache_init: unable to create a memcache(3) memory context");
 
