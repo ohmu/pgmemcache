@@ -96,11 +96,15 @@ AS 'MODULE_PATHNAME', 'memcache_delete' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_delete(TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_delete' LANGUAGE 'C';
 
+-- Flush all servers in the cluster
+CREATE OR REPLACE FUNCTION memcache_flush_all() RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_flush_all0' LANGUAGE 'C';
+
 -- $1 = key to server to be flushed
-CREATE OR REPLACE FUNCTION memcache_flush_all(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_flush_all' LANGUAGE 'C';
+CREATE OR REPLACE FUNCTION memcache_flush(TEXT) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_flush' LANGUAGE 'C';
 
-
+-- Cleans up the backend
 CREATE OR REPLACE FUNCTION memcache_free() RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_free' LANGUAGE 'C';
 
@@ -170,3 +174,9 @@ AS 'MODULE_PATHNAME', 'memcache_stats' LANGUAGE 'C';
 -- $1 = stat name - TEXT
 CREATE OR REPLACE FUNCTION memcache_stats(TEXT) RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_stat' LANGUAGE 'C';
+
+
+-- DEPRECIATED!!!  Use memcache_flush(TEXT) instead!!!
+-- $1 = key to server to be flushed
+CREATE OR REPLACE FUNCTION memcache_flush_all(TEXT) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_flush_all' LANGUAGE 'C';

@@ -76,12 +76,14 @@ memcache_delete(/* key */ TEXT)
 	Deletes a given key. If a hold timer is specified, key with
 	the same name can not be added until the hold timer expires.
 
-memcache_flush_all(/* key */ TEXT)
-	Flushes all keys from the backend as calculated by the passed
-	key.
+memcache_flush_all()
+	Flushes all data on all servers in the memcache cluster.
+
+memcache_flush(/* key */ TEXT)
+	Flushes all keys from the backend that the given key maps to.
 
 memcache_free()
-	Cleans up libmemcache from the backend.
+	Cleans up and frees all data allocated by libmemcache(3).
 
 value = memcache_get(/* key */ TEXT)
 	Fetches a key out of the cache.  Returns a TEXT for keys that

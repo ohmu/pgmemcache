@@ -200,8 +200,15 @@ memcache_delete(PG_FUNCTION_ARGS) {
 }
 
 
+/* Depreciated: use memcache_flush() */
 Datum
 memcache_flush_all(PG_FUNCTION_ARGS) {
+  return memcache_flush(fcinfo);
+}
+
+
+Datum
+memcache_flush_all0(PG_FUNCTION_ARGS) {
   text		*key;
   size_t	 key_len;
   int		 ret;
@@ -215,7 +222,42 @@ memcache_flush_all(PG_FUNCTION_ARGS) {
   if (key_len < 1)
     elog(ERROR, "Unable to have a zero length key");
 
-  ret = mcm_flush_all(ctxt, mc, VARDATA(key), key_len);
+  ret = mcm_flush_all(ctxt, mc);
+
+  SPI_finish();
+
+  if (ret == 0)
+    PG_RETURN_BOOL(true);
+  else if (ret > 0)
+    PG_RETURN_BOOL(false);
+  else
+    elog(ERROR, "Internal libmemcache(3) error");
+
+  PG_RETURN_BOOL(ret);
+}
+
+
+Datum
+memcache_flush(PG_FUNCTION_ARGS) {
+  struct memcache_server *ms;
+  text		*key;
+  size_t	 key_len;
+  int		 ret;
+  u_int32_t	 hash;
+
+  MCM_CHECK(PG_RETURN_NULL());
+
+  SPI_connect();
+
+  key = PG_GETARG_TEXT_P(0);
+  key_len = VARSIZE(key) - VARHDRSZ;
+  if (key_len < 1)
+    elog(ERROR, "Unable to have a zero length key");
+
+  hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
+  ms = mcm_find_server(ctxt, mc, hash);
+
+  ret = mcm_flush(ctxt, mc, ms);
 
   SPI_finish();
 
