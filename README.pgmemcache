@@ -6,7 +6,7 @@ requirements.
 
 REQUIREMENTS:
 
-*) libmemcache(3) 1.1.0 or newer.
+*) memcache(3) 1.2.1 or newer (aka libmemcache):
 
    http://people.FreeBSD.org/~seanc/libmemcache/
 
@@ -15,8 +15,7 @@ REQUIREMENTS:
    http://pmk.sf.net/
 
 *) PostgreSQL 8.0 rc2 or newer.  pgmemcache may work on older versions
-   of PostgreSQL, but will likely have to be compiled by
-   hand.
+   of PostgreSQL, but will likely have to be compiled by hand.
 
    http://www.PostgreSQL.org/
 
@@ -58,10 +57,12 @@ memcache_server_add(/* server name */ TEXT, /* port */ TEXT)
 	for ideas on how this is used.
 
 memcache_server_find(/* hash */ INT4)
-	Returns the hostname:port of the server assigned the hash value
+	Returns the hostname:port of the server assigned the hash
+	value
 
 memcache_server_find(/* key */ TEXT)
-	Returns the hostname:port of the server containing the specified key
+	Returns the hostname:port of the server containing the
+	specified key
 
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL, /* flags */ INT2)
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
@@ -69,7 +70,7 @@ memcache_add(/* key */ TEXT, /* value */ TEXT)
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE, /* flags */ INT2)
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE)
 	Adds a key to the cache cluster if the key does not already
-	exist.
+	exist.  See also memcache_replace() and memcache_set().
 
 newval = memcache_decr(/* key */ TEXT, /* decrement */ INT4)
 newval = memcache_decr(/* key */ TEXT)
@@ -89,7 +90,7 @@ memcache_flush(/* key */ TEXT)
 	Flushes all keys from the backend that the given key maps to.
 
 memcache_free()
-	Cleans up and frees all data allocated by libmemcache(3).
+	Cleans up and frees all data allocated by memcache(3).
 
 value = memcache_get(/* key */ TEXT)
 	Fetches a key out of the cache.  Returns a TEXT for keys that
@@ -111,13 +112,16 @@ memcache_replace(/* key */ TEXT, /* value */ TEXT)
 memcache_replace(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE, /* flags */ INT2)
 memcache_replace(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE)
 	Replaces an existing key's s value if the key already exists.
+	See also memcache_add() and memcache_set().
 
 memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL, /* flags */ INT2)
 memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
 memcache_set(/* key */ TEXT, /* value */ TEXT)
 memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE, /* flags */ INT2)
 memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMP WITH TIME ZONE)
-	Regardless of whether the key to the specified value.
+	Store the key and value regardless of whether or not the key
+	already exists.  See also memcache_add() and
+	memcache_replace().
 
 stats = memcache_stats()
 	Returns a TEXT string with all of the stats from all servers
