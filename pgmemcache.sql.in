@@ -21,6 +21,8 @@
 -- SOFTWARE.
 --
 -- http://people.FreeBSD.org/~seanc/pgmemcache/
+--
+-- $PostgreSQL$
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;

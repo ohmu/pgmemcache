@@ -1,6 +1,8 @@
 /*
  * PostgreSQL functions to interface with memcache.
  *
+ * $PostgreSQL$
+ *
  * Copyright (c) 2004 Sean Chittenden <sean@chittenden.org>
  *
  * Permission is hereby granted, free of charge, to any person
