@@ -48,8 +48,10 @@ Makefile:	Makefile.pmk
 
 release:
 	rm -rf $(RELEASENAME)
+	cvs2cl.pl
 	cvs export -d $(RELEASENAME) -r HEAD pgmemcache
 	rm -f $(RELEASENAME)/.cvsignore
+	mv -f ChangeLog $(RELEASENAME)
 	sudo chown -R 1000:1000 $(RELEASENAME)
 	tar -cvpf $(RELEASENAME).tar $(RELEASENAME)
 	bzip2 -9f $(RELEASENAME).tar

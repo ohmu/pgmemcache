@@ -6,7 +6,7 @@ requirements.
 
 REQUIREMENTS:
 
-*) libmemcache(3) 1.1.0rc2 or newer.
+*) libmemcache(3) 1.1.0 or newer.
 
    http://people.FreeBSD.org/~seanc/libmemcache/
 
@@ -26,7 +26,7 @@ INSTALLATION:
 	Substitute 'gmake' with whatever GNU make's name is on your
 	platform (normally gmake, gnumake, or make).
 
-	% pmk	(or `pmk -e debug_cflags` for debugging info)
+	% pmk	(or `pmk -e debug` for debugging info)
 	% gmake
 	% sudo gmake install
 
