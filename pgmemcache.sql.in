@@ -36,6 +36,10 @@ AS 'MODULE_PATHNAME', 'memcache_init' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_server_add(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_server_add' LANGUAGE 'C' STRICT;
 
+-- $1 = key to look up server with - TEXT
+CREATE OR REPLACE FUNCTION memcache_server_find(TEXT) RETURNS TEXT
+AS 'MODULE_PATHNAME', 'memcache_server_find' LANGUAGE 'C' STRICT;
+
 
 -- $1 = key - TEXT
 -- $2 = val - TEXT (opt)

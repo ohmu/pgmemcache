@@ -57,6 +57,9 @@ memcache_server_add(/* server name */ TEXT, /* port */ TEXT)
 	wrapped in an IF statement).  See the mc_init() example below
 	for ideas on how this is used.
 
+memcache_server_find(/* key */ TEXT)
+	Returns the hostname:port of the server containing the specified key
+
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL, /* flags */ INT2)
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
 memcache_add(/* key */ TEXT, /* value */ TEXT)

@@ -255,7 +255,7 @@ memcache_flush(PG_FUNCTION_ARGS) {
     elog(ERROR, "Unable to have a zero length key");
 
   hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
-  ms = mcm_find_server(ctxt, mc, hash);
+  ms = mcm_server_find(ctxt, mc, hash);
 
   ret = mcm_flush(ctxt, mc, ms);
 
@@ -386,6 +386,8 @@ _memcache_init(void) {
 
   /* Initialize libmemcache's memory functions */
   ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc, mcm_pstrdup);
+  if (ctxt == NULL)
+    elog(ERROR, "memcache_init: unable to create a memcache(3) memory context");
 
   mc = mcm_new(ctxt);
   if (mc == NULL)
@@ -548,6 +550,51 @@ memcache_server_add(PG_FUNCTION_ARGS) {
   SPI_finish();
 
   PG_RETURN_BOOL(true);
+}
+
+
+Datum
+memcache_server_find(PG_FUNCTION_ARGS) {
+  struct memcache_server *ms;
+  text *key, *ret;
+  u_int32_t hash;
+  size_t key_len;
+  char *cp;
+
+  MCM_CHECK(PG_RETURN_BOOL(false));
+
+  SPI_connect();
+
+  key = PG_GETARG_TEXT_P(0);
+  key_len = VARSIZE(key) - VARHDRSZ;
+  if (key_len < 1)
+    elog(ERROR, "Unable to have a zero length key");
+
+  hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
+  ms = mcm_server_find(ctxt, mc, hash);
+
+  ret = (text *)SPI_palloc(strlen(ms->hostname) + strlen(ms->port) + 1); /* + 1 is for the colon */
+  VARATT_SIZEP(ret) = strlen(ms->hostname) + strlen(ms->port) + 1 + VARHDRSZ;
+  cp = VARDATA(ret);
+
+  /* Copy the hostname */
+  if (ms->hostname != NULL)
+    memcpy(cp, ms->hostname, strlen(ms->hostname));
+
+  /* Advance the pointer */
+  cp += strlen(ms->hostname);
+
+  /* Add a colon and advance the pointer */
+  cp[0] = ':';
+  cp++;
+
+  /* Copy the port */
+  if (ms->port != NULL)
+    memcpy(cp, ms->port, strlen(ms->port));
+
+  SPI_finish();
+
+  PG_RETURN_TEXT_P(ret);
 }
 
 
