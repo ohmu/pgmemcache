@@ -77,6 +77,9 @@ PG_FUNCTION_INFO_V1(memcache_server_add);
 Datum memcache_server_find(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_server_find);
 
+Datum memcache_server_find_hash(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_server_find_hash);
+
 Datum memcache_set(PG_FUNCTION_ARGS);
 Datum memcache_set_absexpire(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_set);

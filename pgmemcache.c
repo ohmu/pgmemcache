@@ -50,6 +50,7 @@ inline static void	*mcm_repalloc(void *ptr, const size_t size);
 inline static char	*mcm_pstrdup(const char *str);
 static bool		 _memcache_init(void);
 static Datum		 memcache_atomic_op(int type, PG_FUNCTION_ARGS);
+static text		*memcache_gen_host(const struct memcache_server *ms);
 static Datum		 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 
 #define MCM_SET_CMD_TYPE_ADD 0x0001
@@ -553,25 +554,10 @@ memcache_server_add(PG_FUNCTION_ARGS) {
 }
 
 
-Datum
-memcache_server_find(PG_FUNCTION_ARGS) {
-  struct memcache_server *ms;
-  text *key, *ret;
-  u_int32_t hash;
-  size_t key_len;
+static text *
+memcache_gen_host(const struct memcache_server *ms) {
+  text *ret;
   char *cp;
-
-  MCM_CHECK(PG_RETURN_BOOL(false));
-
-  SPI_connect();
-
-  key = PG_GETARG_TEXT_P(0);
-  key_len = VARSIZE(key) - VARHDRSZ;
-  if (key_len < 1)
-    elog(ERROR, "Unable to have a zero length key");
-
-  hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
-  ms = mcm_server_find(ctxt, mc, hash);
 
   ret = (text *)SPI_palloc(strlen(ms->hostname) + strlen(ms->port) + 1); /* + 1 is for the colon */
   VARATT_SIZEP(ret) = strlen(ms->hostname) + strlen(ms->port) + 1 + VARHDRSZ;
@@ -591,6 +577,48 @@ memcache_server_find(PG_FUNCTION_ARGS) {
   /* Copy the port */
   if (ms->port != NULL)
     memcpy(cp, ms->port, strlen(ms->port));
+
+  return ret;
+}
+
+
+Datum
+memcache_server_find(PG_FUNCTION_ARGS) {
+  struct memcache_server *ms;
+  text *key, *ret;
+  u_int32_t hash;
+  size_t key_len;
+
+  MCM_CHECK(PG_RETURN_BOOL(false));
+
+  SPI_connect();
+
+  key = PG_GETARG_TEXT_P(0);
+  key_len = VARSIZE(key) - VARHDRSZ;
+  if (key_len < 1)
+    elog(ERROR, "Unable to have a zero length key");
+
+  hash = mcm_hash_key(ctxt, VARDATA(key), key_len);
+  ms = mcm_server_find(ctxt, mc, hash);
+  ret = memcache_gen_host(ms);
+
+  SPI_finish();
+
+  PG_RETURN_TEXT_P(ret);
+}
+
+
+Datum
+memcache_server_find_hash(PG_FUNCTION_ARGS) {
+  struct memcache_server *ms;
+  text *ret;
+
+  MCM_CHECK(PG_RETURN_BOOL(false));
+
+  SPI_connect();
+
+  ms = mcm_server_find(ctxt, mc, PG_GETARG_UINT32(0));
+  ret = memcache_gen_host(ms);
 
   SPI_finish();
 

@@ -40,6 +40,10 @@ AS 'MODULE_PATHNAME', 'memcache_server_add' LANGUAGE 'C' STRICT;
 CREATE OR REPLACE FUNCTION memcache_server_find(TEXT) RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_server_find' LANGUAGE 'C' STRICT;
 
+-- $1 = hash value to look up server with - INT4
+CREATE OR REPLACE FUNCTION memcache_server_find(INT4) RETURNS TEXT
+AS 'MODULE_PATHNAME', 'memcache_server_find_hash' LANGUAGE 'C' STRICT;
+
 
 -- $1 = key - TEXT
 -- $2 = val - TEXT (opt)
