@@ -198,15 +198,9 @@ int32_t
 memcache_err_func(MCM_ERR_FUNC_ARGS) {
   const struct memcache_ctxt *ctxt;
   struct memcache_err_ctxt *ectxt;
-  const char *errno_str;
   int pg_err_lvl;
 
   MCM_ERR_INIT_CTXT(ctxt, ectxt);
-
-  if (ectxt->errnum != 0)
-    errno_str = strerror(ectxt->errnum);
-  else
-    errno_str = NULL;
 
   switch (ectxt->severity) {
   case MCM_ERR_LVL_INFO:
@@ -233,25 +227,16 @@ memcache_err_func(MCM_ERR_FUNC_ARGS) {
    *
    * ectxt->errmsg - per error message passed along via one of the MCM_*_MSG() macros (optional)
    * ectxt->errstr - memcache(3) error string (optional, though almost always set)
-   * errno_str - errno error string (optional)
    */
 
-  if (ectxt->errmsg != NULL && errno_str != NULL && ectxt->errmsg != NULL)
-    elog(pg_err_lvl, "%s():%u: %s: %s: %.*s\n", ectxt->funcname, ectxt->lineno, ectxt->errstr, errno_str, (int)ectxt->errlen, ectxt->errmsg);
-  else if (ectxt->errmsg == NULL && errno_str != NULL && ectxt->errmsg != NULL)
-    elog(pg_err_lvl, "%s():%u: %s: %.*s\n", ectxt->funcname, ectxt->lineno, errno_str, (int)ectxt->errlen, ectxt->errmsg);
-  else if (ectxt->errmsg != NULL && errno_str == NULL && ectxt->errmsg != NULL)
-    elog(pg_err_lvl, "%s():%u: %s: %.*s\n", ectxt->funcname, ectxt->lineno, ectxt->errstr, (int)ectxt->errlen, ectxt->errmsg);
-  else if (ectxt->errmsg != NULL && errno_str != NULL && ectxt->errmsg == NULL)
-    elog(pg_err_lvl, "%s():%u: %s: %s\n", ectxt->funcname, ectxt->lineno, errno_str, ectxt->errstr);
-  else if (ectxt->errmsg == NULL && errno_str == NULL && ectxt->errmsg != NULL)
-    elog(pg_err_lvl, "%s():%u: %.*s\n", ectxt->funcname, ectxt->lineno, (int)ectxt->errlen, ectxt->errmsg);
-  else if (ectxt->errmsg == NULL && errno_str != NULL && ectxt->errmsg == NULL)
-    elog(pg_err_lvl, "%s():%u: %s\n", ectxt->funcname, ectxt->lineno, errno_str);
-  else if (ectxt->errmsg != NULL && errno_str == NULL && ectxt->errmsg == NULL)
-    elog(pg_err_lvl, "%s():%u: %s\n", ectxt->funcname, ectxt->lineno, ectxt->errmsg);
+  if (ectxt->errstr != NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %s: %.*s", ectxt->funcname, ectxt->lineno, ectxt->errstr, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errstr == NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %.*s", ectxt->funcname, ectxt->lineno, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errstr != NULL && ectxt->errmsg == NULL)
+    elog(pg_err_lvl, "%s():%u: %s", ectxt->funcname, ectxt->lineno, ectxt->errstr);
   else
-    elog(pg_err_lvl, "%s():%u\n", ectxt->funcname, ectxt->lineno);
+    elog(pg_err_lvl, "%s():%u", ectxt->funcname, ectxt->lineno);
 
   return 0;
 }
