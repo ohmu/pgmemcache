@@ -34,7 +34,7 @@ DOCS		= README.$(MODULE_big)
 DATA_built	= $(MODULE_big).sql
 LIBMEMCACHEPREFIX	?= @PREFIX@
 
-EXTRA_CLEAN	= Makefile pmk.log
+EXTRA_CLEAN	= Makefile pmk.log *.bak *~
 
 PG_CPPFLAGS	= -I$(LIBMEMCACHEPREFIX)/include -I$(srcdir)
 SHLIB_LINK	= -L$(LIBMEMCACHEPREFIX)/lib -lmemcache
