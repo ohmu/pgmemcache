@@ -29,7 +29,7 @@
 #ifndef PGMEMCACHE_H
 #define PGMEMCACHE_H
 
-#include <libmemcache.h>
+#include <memcache.h>
 
 Datum memcache_add(PG_FUNCTION_ARGS);
 Datum memcache_add_absexpire(PG_FUNCTION_ARGS);
