@@ -188,7 +188,7 @@ memcache_delete(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal libmemcache(3) error");
+    elog(ERROR, "Internal memcache(3) error");
 
   PG_RETURN_BOOL(ret);
 }
@@ -273,7 +273,7 @@ memcache_flush_all0(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal libmemcache(3) error");
+    elog(ERROR, "Internal memcache(3) error");
 
   PG_RETURN_BOOL(ret);
 }
@@ -308,7 +308,7 @@ memcache_flush(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal libmemcache(3) error");
+    elog(ERROR, "Internal memcache(3) error");
 
   PG_RETURN_BOOL(ret);
 }
@@ -426,7 +426,7 @@ _memcache_init(void) {
   /* Make sure mc is allocated in the top memory context */
   oc = MemoryContextSwitchTo(TopMemoryContext);
 
-  /* Initialize libmemcache's memory functions */
+  /* Initialize memcache(3)'s memory functions */
   ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc);
   if (ctxt == NULL)
     elog(ERROR, "memcache_init: unable to create a memcache(3) execution context");
@@ -540,12 +540,12 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
   if (fcinfo->arg[3] != NULL && !PG_ARGISNULL(3))
     flags = PG_GETARG_INT16(3);
 
-  if (type & MCM_SET_CMD_TYPE_ADD)
+  if ((type & MCM_SET_CMD_TYPE_ADD) != 0)
     ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
-  else if (type & MCM_SET_CMD_TYPE_REPLACE)
-    ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
-  else if (type & MCM_SET_CMD_TYPE_SET)
-    ret = mcm_add(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
+  else if ((type & MCM_SET_CMD_TYPE_REPLACE) != 0)
+    ret = mcm_replace(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
+  else if ((type & MCM_SET_CMD_TYPE_SET) != 0)
+    ret = mcm_set(ctxt, mc, VARDATA(key), key_len, val, val_len, (time_t)expire, flags);
   else
     elog(ERROR, "%s():%s:%u\tunknown set type 0x%x", __FUNCTION__, __FILE__, __LINE__, type);
 
@@ -555,7 +555,7 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal libmemcache(3) error");
+    elog(ERROR, "Internal memcache(3) error");
 
   /* Not reached */
   abort();
@@ -583,7 +583,40 @@ memcache_server_add(PG_FUNCTION_ARGS) {
   /* Add the server and port */
   ret = mcm_server_add2(ctxt, mc, VARDATA(server), VARSIZE(server) - VARHDRSZ, VARDATA(port), VARSIZE(port) - VARHDRSZ);
   if (ret < 0) {
-    elog(NOTICE, "%s(): libmemcache unable to add server: %d", __FUNCTION__, ret);
+    elog(NOTICE, "%s(): memcache(3) unable to add server: %d", __FUNCTION__, ret);
+    MemoryContextSwitchTo(oc);
+    SPI_finish();
+    PG_RETURN_BOOL(false);
+  }
+
+  /* Return to current context */
+  MemoryContextSwitchTo(oc);
+
+  SPI_finish();
+
+  PG_RETURN_BOOL(true);
+}
+
+
+Datum
+memcache_server_add2(PG_FUNCTION_ARGS) {
+  text *hostport;
+  int ret;
+  MemoryContext oc;
+
+  MCM_CHECK(PG_RETURN_BOOL(false));
+
+  SPI_connect();
+
+  /* Make sure new servers are in the top memory context */
+  oc = MemoryContextSwitchTo(TopMemoryContext);
+
+  hostport = PG_GETARG_TEXT_P(0);
+
+  /* Add the server and port */
+  ret = mcm_server_add5(ctxt, mc, VARDATA(hostport), VARSIZE(hostport) - VARHDRSZ);
+  if (ret < 0) {
+    elog(NOTICE, "%s(): memcache(3) unable to add server: %d", __FUNCTION__, ret);
     MemoryContextSwitchTo(oc);
     SPI_finish();
     PG_RETURN_BOOL(false);
