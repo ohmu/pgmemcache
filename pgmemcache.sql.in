@@ -1,4 +1,4 @@
--- Copyright (c) 2004 Sean Chittenden <sean@chittenden.org>
+-- Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
 --
 -- Permission is hereby granted, free of charge, to any person
 -- obtaining a copy of this software and associated documentation
@@ -31,10 +31,18 @@ CREATE OR REPLACE FUNCTION memcache_init() RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_init' LANGUAGE 'C';
 
 
+-- Reactivates all servers in a server list
+CREATE OR REPLACE FUNCTION memcache_server_activate_all() RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_server_activate_all' LANGUAGE 'C' STRICT;
+
 -- $1 = server name - TEXT
 -- $2 = port number - TEXT
 CREATE OR REPLACE FUNCTION memcache_server_add(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_server_add' LANGUAGE 'C' STRICT;
+
+-- $1 = server name:port number - TEXT
+CREATE OR REPLACE FUNCTION memcache_server_add(TEXT) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_server_add2' LANGUAGE 'C' STRICT;
 
 -- $1 = key to look up server with - TEXT
 CREATE OR REPLACE FUNCTION memcache_server_find(TEXT) RETURNS TEXT

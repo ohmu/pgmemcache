@@ -563,6 +563,22 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
 
 
 Datum
+memcache_server_activate_all(PG_FUNCTION_ARGS) {
+  int ret;
+
+  MCM_CHECK(PG_RETURN_BOOL(false));
+
+  SPI_connect();
+
+  ret = mcm_server_activate_all(ctxt, mc);
+
+  SPI_finish();
+
+  PG_RETURN_BOOL((ret == 0 ? true : false));
+}
+
+
+Datum
 memcache_server_add(PG_FUNCTION_ARGS) {
   text *server, *port;
   int ret;

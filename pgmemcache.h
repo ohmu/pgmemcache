@@ -4,7 +4,7 @@
  *
  * $PostgreSQL$
  *
- * Copyright (c) 2004 Sean Chittenden <sean@chittenden.org>
+ * Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -73,6 +73,13 @@ PG_FUNCTION_INFO_V1(memcache_replace_absexpire);
 
 Datum memcache_server_add(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_server_add);
+
+Datum memcache_server_add2(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_server_add2);
+
+Datum memcache_server_activate_all(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(memcache_server_activate_all);
+
 
 Datum memcache_server_find(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(memcache_server_find);
