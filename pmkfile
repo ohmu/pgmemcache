@@ -29,16 +29,16 @@ SETTINGS {
 }
 
 SWITCHES {
-	debug_cflags = FALSE
+	debug = FALSE
 }
 
-IF(!debug_cflags) {
+IF(!debug) {
 	DEFINE {
 		CFLAGS = "-std=c99 -pipe -O3"
 	}
 }
 
-IF(debug_cflags) {
+IF(debug) {
 	DEFINE {
 		CFLAGS = "-std=c99 -g -Wall -Wunused -Wshadow -Wpointer-arith -Wbad-function-cast -Wcast-qual -Wcast-align -Wwrite-strings -Wsign-compare -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wmissing-noreturn -Wformat -Wpacked -Wdeprecated-declarations -Wredundant-decls -Wnested-externs -Winline -Wdisabled-optimization -pipe -pedantic"
 	}
