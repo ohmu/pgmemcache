@@ -48,7 +48,7 @@ Makefile:	Makefile.pmk
 
 release:
 	rm -rf $(RELEASENAME)
-	cvs2cl.pl
+	cvs2cl
 	cvs export -d $(RELEASENAME) -r HEAD pgmemcache
 	rm -f $(RELEASENAME)/.cvsignore
 	mv -f ChangeLog $(RELEASENAME)

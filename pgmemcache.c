@@ -3,7 +3,7 @@
  *
  * $PostgreSQL$
  *
- * Copyright (c) 2004 Sean Chittenden <sean@chittenden.org>
+ * Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -48,6 +48,7 @@ inline static void	*mcm_palloc(const size_t size);
 inline static void	*mcm_repalloc(void *ptr, const size_t size);
 static bool		 _memcache_init(void);
 static Datum		 memcache_atomic_op(int type, PG_FUNCTION_ARGS);
+static int32_t		 memcache_err_func(MCM_ERR_FUNC_SIG);
 static text		*memcache_gen_host(const struct memcache_server *ms);
 static Datum		 memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 
@@ -190,6 +191,69 @@ memcache_delete(PG_FUNCTION_ARGS) {
     elog(ERROR, "Internal libmemcache(3) error");
 
   PG_RETURN_BOOL(ret);
+}
+
+
+int32_t
+memcache_err_func(MCM_ERR_FUNC_ARGS) {
+  const struct memcache_ctxt *ctxt;
+  struct memcache_err_ctxt *ectxt;
+  const char *errno_str;
+  int pg_err_lvl;
+
+  MCM_ERR_INIT_CTXT(ctxt, ectxt);
+
+  if (ectxt->errnum != 0)
+    errno_str = strerror(ectxt->errnum);
+  else
+    errno_str = NULL;
+
+  switch (ectxt->severity) {
+  case MCM_ERR_LVL_INFO:
+    pg_err_lvl = INFO;
+    break;
+  case MCM_ERR_LVL_NOTICE:
+    pg_err_lvl = NOTICE;
+    break;
+  case MCM_ERR_LVL_WARN:
+    pg_err_lvl = WARNING;
+    break;
+  case MCM_ERR_LVL_ERR:
+    pg_err_lvl = ERROR;
+    break;
+  case MCM_ERR_LVL_FATAL:
+    /* fall through */
+  default:
+    pg_err_lvl = FATAL;
+    break;
+  }
+
+  /*
+   * Quick explaination of the various bits of text:
+   *
+   * ectxt->errmsg - per error message passed along via one of the MCM_*_MSG() macros (optional)
+   * ectxt->errstr - memcache(3) error string (optional, though almost always set)
+   * errno_str - errno error string (optional)
+   */
+
+  if (ectxt->errmsg != NULL && errno_str != NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %s: %s: %.*s\n", ectxt->funcname, ectxt->lineno, ectxt->errstr, errno_str, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errmsg == NULL && errno_str != NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %s: %.*s\n", ectxt->funcname, ectxt->lineno, errno_str, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errmsg != NULL && errno_str == NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %s: %.*s\n", ectxt->funcname, ectxt->lineno, ectxt->errstr, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errmsg != NULL && errno_str != NULL && ectxt->errmsg == NULL)
+    elog(pg_err_lvl, "%s():%u: %s: %s\n", ectxt->funcname, ectxt->lineno, errno_str, ectxt->errstr);
+  else if (ectxt->errmsg == NULL && errno_str == NULL && ectxt->errmsg != NULL)
+    elog(pg_err_lvl, "%s():%u: %.*s\n", ectxt->funcname, ectxt->lineno, (int)ectxt->errlen, ectxt->errmsg);
+  else if (ectxt->errmsg == NULL && errno_str != NULL && ectxt->errmsg == NULL)
+    elog(pg_err_lvl, "%s():%u: %s\n", ectxt->funcname, ectxt->lineno, errno_str);
+  else if (ectxt->errmsg != NULL && errno_str == NULL && ectxt->errmsg == NULL)
+    elog(pg_err_lvl, "%s():%u: %s\n", ectxt->funcname, ectxt->lineno, ectxt->errmsg);
+  else
+    elog(pg_err_lvl, "%s():%u\n", ectxt->funcname, ectxt->lineno);
+
+  return 0;
 }
 
 
@@ -380,7 +444,10 @@ _memcache_init(void) {
   /* Initialize libmemcache's memory functions */
   ctxt = mcMemNewCtxt(mcm_pfree, mcm_palloc, NULL, mcm_repalloc);
   if (ctxt == NULL)
-    elog(ERROR, "memcache_init: unable to create a memcache(3) memory context");
+    elog(ERROR, "memcache_init: unable to create a memcache(3) execution context");
+
+  if (mcErrSetupCtxt(ctxt, memcache_err_func) != 0)
+    elog(ERROR, "memcache_init: unable to register error handler");
 
   mc = mcm_new(ctxt);
   if (mc == NULL)
