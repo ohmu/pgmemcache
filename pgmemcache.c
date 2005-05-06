@@ -188,7 +188,7 @@ memcache_delete(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal memcache(3) error");
+    elog(ERROR, "Internal libmemcache(3) error during delete (code: %d)", ret);
 
   PG_RETURN_BOOL(ret);
 }
@@ -273,7 +273,7 @@ memcache_flush_all0(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal memcache(3) error");
+    elog(ERROR, "Internal libmemcache(3) error during flush_all (code: %d)", ret);
 
   PG_RETURN_BOOL(ret);
 }
@@ -308,7 +308,7 @@ memcache_flush(PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal memcache(3) error");
+    elog(ERROR, "Internal libmemcache(3) error during flush (%d)", ret);
 
   PG_RETURN_BOOL(ret);
 }
@@ -555,7 +555,7 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS) {
   else if (ret > 0)
     PG_RETURN_BOOL(false);
   else
-    elog(ERROR, "Internal memcache(3) error");
+    elog(ERROR, "Internal libmemcache(3) error during set (code %d)", ret);
 
   /* Not reached */
   abort();
