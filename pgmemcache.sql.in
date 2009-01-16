@@ -1,89 +1,36 @@
 -- Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
+-- Copyright (c) 2007 Neil Conway <neilc@samurai.com>
+-- Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
+-- Copyright (c) 2008 Hannu Valtonen <hannu.valtonen@hut.fi>
 --
--- Permission is hereby granted, free of charge, to any person
--- obtaining a copy of this software and associated documentation
--- files (the "Software"), to deal in the Software without
--- restriction, including without limitation the rights to use, copy,
--- modify, merge, publish, distribute, sublicense, and/or sell copies
--- of the Software, and to permit persons to whom the Software is
--- furnished to do so, subject to the following conditions:
+--$PostgreSQL$
 --
--- The above copyright notice and this permission notice shall be
--- included in all copies or substantial portions of the Software.
---
--- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
--- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
--- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
--- NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
--- BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
--- ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
--- CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
--- SOFTWARE.
---
--- http://people.FreeBSD.org/~seanc/pgmemcache/
---
--- $PostgreSQL$
+-- See the file COPYING for distribution terms.
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;
 
-CREATE OR REPLACE FUNCTION memcache_init() RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_init' LANGUAGE 'C';
-
-
--- Reactivates all servers in a server list
-CREATE OR REPLACE FUNCTION memcache_server_activate_all() RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_server_activate_all' LANGUAGE 'C' STRICT;
-
--- $1 = server name - TEXT
--- $2 = port number - TEXT
-CREATE OR REPLACE FUNCTION memcache_server_add(TEXT, TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_server_add' LANGUAGE 'C' STRICT;
-
--- $1 = server name:port number - TEXT
+-- $1 = server hostname - TEXT
 CREATE OR REPLACE FUNCTION memcache_server_add(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_server_add2' LANGUAGE 'C' STRICT;
-
--- $1 = key to look up server with - TEXT
-CREATE OR REPLACE FUNCTION memcache_server_find(TEXT) RETURNS TEXT
-AS 'MODULE_PATHNAME', 'memcache_server_find' LANGUAGE 'C' STRICT;
-
--- $1 = hash value to look up server with - INT4
-CREATE OR REPLACE FUNCTION memcache_server_find(INT4) RETURNS TEXT
-AS 'MODULE_PATHNAME', 'memcache_server_find_hash' LANGUAGE 'C' STRICT;
-
+AS 'MODULE_PATHNAME', 'memcache_server_add' LANGUAGE 'C' STRICT;
 
 -- $1 = key - TEXT
 -- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
+-- $3 = expire - INTERVAL or TIMESTAMPTZ (opt)
 -- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT, INTERVAL, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
-
 CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT, INTERVAL) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
+
+CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT, TIMESTAMPTZ) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_add_absexpire' LANGUAGE 'C';
 
 CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
 
-CREATE OR REPLACE FUNCTION memcache_add(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
-
-
--- $1 = key - TEXT
--- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
--- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT, TIMESTAMP WITH TIME ZONE, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_add_absexpire' LANGUAGE 'C';
-
-CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT, TIMESTAMP WITH TIME ZONE) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_add_absexpire' LANGUAGE 'C';
-
 
 -- $1 = key - TEXT
 CREATE OR REPLACE FUNCTION memcache_get(TEXT) RETURNS TEXT
-AS 'MODULE_PATHNAME', 'memcache_get' LANGUAGE 'C' STRICT;
+AS 'MODULE_PATHNAME', 'memcache_get' LANGUAGE 'C';
 
 
 -- $1 = key - TEXT
@@ -98,10 +45,10 @@ AS 'MODULE_PATHNAME', 'memcache_decr' LANGUAGE 'C';
 -- $1 = key - TEXT
 -- $2 = increment - INT4, default 1 (opt)
 CREATE OR REPLACE FUNCTION memcache_incr(TEXT, INT4) RETURNS INT4
-AS 'MODULE_PATHNAME', 'memcache_incr' LANGUAGE 'C';
+AS 'MODULE_PATHNAME', 'memcache_incr' LANGUAGE 'C' STRICT;
 
 CREATE OR REPLACE FUNCTION memcache_incr(TEXT) RETURNS INT4
-AS 'MODULE_PATHNAME', 'memcache_incr' LANGUAGE 'C';
+AS 'MODULE_PATHNAME', 'memcache_incr' LANGUAGE 'C' STRICT;
 
 
 -- $1 = key - TEXT
@@ -116,83 +63,33 @@ AS 'MODULE_PATHNAME', 'memcache_delete' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_flush_all() RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_flush_all0' LANGUAGE 'C';
 
--- $1 = key to server to be flushed
-CREATE OR REPLACE FUNCTION memcache_flush(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_flush' LANGUAGE 'C';
-
--- Cleans up the backend
-CREATE OR REPLACE FUNCTION memcache_free() RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_free' LANGUAGE 'C';
-
-CREATE OR REPLACE FUNCTION memcache_hash(TEXT) RETURNS INT4
-AS 'MODULE_PATHNAME', 'memcache_hash' LANGUAGE 'C';
-
-
 -- $1 = key - TEXT
--- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
--- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT, INTERVAL, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_replace' LANGUAGE 'C';
-
+-- $2 = val - TEXT
+-- $3 = expire - INTERVAL or TIMESTAMPTZ (opt)
 CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT, INTERVAL) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_replace' LANGUAGE 'C';
+
+CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT, TIMESTAMPTZ) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_replace_absexpire' LANGUAGE 'C';
 
 CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_replace' LANGUAGE 'C';
 
-CREATE OR REPLACE FUNCTION memcache_replace(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_replace' LANGUAGE 'C';
-
-
 -- $1 = key - TEXT
--- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
--- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT, TIMESTAMP WITH TIME ZONE, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_replace_absexpire' LANGUAGE 'C';
-
-CREATE OR REPLACE FUNCTION memcache_replace(TEXT, TEXT, TIMESTAMP WITH TIME ZONE) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_replace_absexpire' LANGUAGE 'C';
-
-
--- $1 = key - TEXT
--- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
--- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT, INTERVAL, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
-
+-- $2 = val - TEXT
+-- $3 = expire - INTERVAL or TIMESTAMPTZ (opt)
 CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT, INTERVAL) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
 
+CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT, TIMESTAMPTZ) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_set_absexpire' LANGUAGE 'C';
+
 CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
-
-CREATE OR REPLACE FUNCTION memcache_set(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
-
-
--- $1 = key - TEXT
--- $2 = val - TEXT (opt)
--- $3 = expire - INTERVAL (opt)
--- $4 = flags - INT4 (opt)
-CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT, TIMESTAMP WITH TIME ZONE, INT4) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_set_absexpire' LANGUAGE 'C';
-
-CREATE OR REPLACE FUNCTION memcache_set(TEXT, TEXT, TIMESTAMP WITH TIME ZONE) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_set_absexpire' LANGUAGE 'C';
-
 
 CREATE OR REPLACE FUNCTION memcache_stats() RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_stats' LANGUAGE 'C';
 
 -- $1 = stat name - TEXT
 CREATE OR REPLACE FUNCTION memcache_stats(TEXT) RETURNS TEXT
-AS 'MODULE_PATHNAME', 'memcache_stat' LANGUAGE 'C';
-
-
--- DEPRECIATED!!!  Use memcache_flush(TEXT) instead!!!
--- $1 = key to server to be flushed
-CREATE OR REPLACE FUNCTION memcache_flush_all(TEXT) RETURNS BOOL
-AS 'MODULE_PATHNAME', 'memcache_flush_all' LANGUAGE 'C';
+AS 'MODULE_PATHNAME', 'memcache_stat' LANGUAGE 'C' STRICT;
