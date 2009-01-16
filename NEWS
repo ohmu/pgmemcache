@@ -1,0 +1,126 @@
+pgmemcache 2.0 beta1
+====================
+
+pgmemcache was completely rewritten to work on top of libmemcached. It requires PostgreSQL 8.4+ and
+is not backwards compatible with older versions of PostgreSQL. That may or may not change depending
+on how much are people interested in having it work on older versions. 
+
+Also some API's were deprecated:
+* memcache_server_find_hash
+* memcache_flush (note, not flush all)
+* memcache_server_list (use stats)
+* memcache_server_remove
+* memcache_hash
+
+Also starting from 2.0 beta 1 the maintainership has moved to Hannu Valtonen. 
+
+pgmemcache 1.2 beta1
+====================
+
+This release has a lot of new code and backward-incompatible changes;
+it might be more accurate to label it "2.0".
+
+* Add the pgmemcache.default_servers GUC variable. This specifies a
+  list of memcached servers ('host:port' pairs) that pgmemcache will
+  connect to by default. To use this, add pgmemcache to
+  preload_shared_libraries and custom_variable_classes, and then
+  define pgmemcache.default_servers as desired, all in postgreql.conf
+
+* Remove memcache_free() and memcache_init(). Instead, define
+  _PG_init() and _PG_fini() functions, so that Postgres can invoke
+  them to do the appropriate initialization/cleanup work when
+  pgmemcache is loaded/unloaded from a process.
+
+* Don't allocate any memory in TopMemoryContext directly. Instead,
+  create a small, long-lived context as a child of TopMemoryContext
+  and use that for the allocations we need to make.
+
+* Add a new function, memcache_server_remove().
+
+* Add a new SRF, memcache_server_list().
+
+* Fix compile breakage against recent CVS HEAD.
+
+* Change memcache_server_find(TEXT) and memcache_server_find(INT4)
+  to use OUT parameters, rather than returning a 'host:port' pair as a
+  single text value.
+
+* Fix for crashes in memcache_incr(), memcache_decr(),
+  memcache_hash(): these weren't prepared to handle NULL inputs.
+
+* Fix crash bug in memcache_flush_all0(): this function tried to
+  access a nonexistent function argument.
+
+* Remove support for memcache_add(TEXT), memcache_set(TEXT), and
+  memcache_replace(TEXT). These were pointless, and treated NULL as
+  the empty string, which is wrong.
+
+* Remove support for the "flags" concept from the API. This wasn't
+  actually feature complete (there was no way to fetch a flags value),
+  and was buggy anyway. I might readd this later.
+
+* Removed deprecated function memcache_flush_all(TEXT);
+  memcache_flush(TEXT) should be used instead.
+
+* Various code cleanup, editorialization on error message formats,
+  and refactorings.
+
+pgmemcache 1.1
+==============
+
+* Add a TODO list.
+
+* Fix a potential memory leak in memcache_server_add(): this function
+  might have unwittingly allocated memory in TopMemoryContext.
+
+* Make the "port" argument to memcache_server_add() optional. If not
+  specified, it defaults to the libmemcache default (11211).
+
+* Add a "dist" target to the Makefile.
+
+
+pgmemcache 1.1 beta1
+====================
+
+* New maintainer: Neil Conway. Thanks to the sponsorship of The Open
+  Technology Group.
+
+* Change build system to use just a normal Makefile and the Postgres
+  PGXS infrastructure, rather than pmk. This means pmk is no longer a
+  build dependency.
+
+* Various fixes to allow pgmemcache to be built against PostgreSQL
+  8.2, including adding PG_MODULE_MAGIC. I've briefly tested this
+  release against CVS HEAD, 8.2, and 8.1. Note that this release will
+  NOT compile against PostgreSQL 8.0 or earlier; if this is important
+  to people, this could be fixed pretty easily.
+
+* Fix a logic error in memcache_set_cmd(): as a result, memcache_set()
+  and memcache_replace() now work as intended, instead of being
+  aliases for memcache_add().
+
+* Fix a buffer overflow in memcache_gen_host(): this function
+  neglected to allocate space for the varlena header.
+
+* Fix a read of uninitialized memory in memcache_atomic_op(),
+  memcache_delete() and memcache_set_cmd().
+
+* Remove all the code that connected and disconnected from SPI. As far
+  as I can see, pgmemcache has no need to use SPI at all: SPI is
+  intended for issuing SQL queries, which pgmemcache has no need to
+  do. Similarly, use palloc() rather than SPI_palloc().
+
+* Fix various compiler warnings with gcc -Wall on AMD64, and
+  presumably other platforms as well. Use the C99 "PRIu64" macro to
+  get a portable printf(3) conversion specifier for 64-bit
+  unsigned integers.
+
+* Fix error message style for elog() message strings: error message
+  should not begin with a capital letter.
+
+* Optimize a few functions to use a stack-allocated StringInfoData,
+  rather than a heap-allocated StringInfo.
+
+* Fix typo in the implementation of memcache_stat(TEXT).
+
+$PostgreSQL$
