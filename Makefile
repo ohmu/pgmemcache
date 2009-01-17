@@ -14,4 +14,4 @@ include $(PGXS)
 # update PGMC_VERSION, adjust the version number in the README, and
 # add an entry to NEWS.
 dist:
-	hg archive -t tgz -X '.hg_archival.txt' ../pgmemcache_$(PGMC_VERSION).tar.gz
+	tar -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
