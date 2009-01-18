@@ -68,9 +68,11 @@ static time_t      interval_to_time_t(Interval *span);
 #define PG_MEMCACHE_ADD					0x0001
 #define PG_MEMCACHE_REPLACE				0x0002
 #define PG_MEMCACHE_SET					0x0004
+#define PG_MEMCACHE_PREPEND                             0x0008
+#define PG_MEMCACHE_APPEND                              0x0010
 
-#define PG_MEMCACHE_TYPE_INTERVAL		0x0010
-#define PG_MEMCACHE_TYPE_TIMESTAMP      0x0020
+#define PG_MEMCACHE_TYPE_INTERVAL		0x0100
+#define PG_MEMCACHE_TYPE_TIMESTAMP              0x0200
 
 void
 _PG_init(void)
@@ -306,6 +308,31 @@ memcache_set_absexpire(PG_FUNCTION_ARGS)
     return memcache_set_cmd(PG_MEMCACHE_SET | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
+Datum
+memcache_prepend(PG_FUNCTION_ARGS)
+{
+	return memcache_set_cmd(PG_MEMCACHE_PREPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+}
+
+Datum
+memcache_prepend_absexpire(PG_FUNCTION_ARGS)
+{
+    return memcache_set_cmd(PG_MEMCACHE_PREPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+}
+
+Datum
+memcache_append(PG_FUNCTION_ARGS)
+{
+	return memcache_set_cmd(PG_MEMCACHE_APPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+}
+
+Datum
+memcache_append_absexpire(PG_FUNCTION_ARGS)
+{
+    return memcache_set_cmd(PG_MEMCACHE_APPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+}
+
+
 static Datum
 memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 {
@@ -382,6 +409,12 @@ do_memcache_set_cmd(int type, char *key, size_t key_length,
 								value, value_length, expiration, 0);
     else if (type & PG_MEMCACHE_SET)
 		rc = memcached_set (globals.mc, key, key_length,
+							value, value_length, expiration, 0);
+    else if (type & PG_MEMCACHE_PREPEND)
+		rc = memcached_prepend (globals.mc, key, key_length,
+							value, value_length, expiration, 0);
+    else if (type & PG_MEMCACHE_APPEND)
+		rc = memcached_append (globals.mc, key, key_length,
 							value, value_length, expiration, 0);
     else
         elog(ERROR, "unknown pgmemcache set command type: %d", type);

@@ -40,6 +40,10 @@ Datum memcache_replace_absexpire(PG_FUNCTION_ARGS);
 Datum memcache_server_add(PG_FUNCTION_ARGS);
 Datum memcache_set(PG_FUNCTION_ARGS);
 Datum memcache_set_absexpire(PG_FUNCTION_ARGS);
+Datum memcache_prepend(PG_FUNCTION_ARGS);
+Datum memcache_prepend_absexpire(PG_FUNCTION_ARGS);
+Datum memcache_append(PG_FUNCTION_ARGS);
+Datum memcache_append_absexpire(PG_FUNCTION_ARGS);
 Datum memcache_stats(PG_FUNCTION_ARGS);
 Datum memcache_stat(PG_FUNCTION_ARGS);
 
