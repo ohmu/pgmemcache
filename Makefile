@@ -1,6 +1,6 @@
 #$PostgreSQL$
 MODULE_big = pgmemcache
-PGMC_VERSION = 2.0beta1
+PGMC_VERSION = 2.0beta2
 
 OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
