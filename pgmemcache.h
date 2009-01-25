@@ -59,6 +59,10 @@ PG_FUNCTION_INFO_V1(memcache_replace_absexpire);
 PG_FUNCTION_INFO_V1(memcache_server_add);
 PG_FUNCTION_INFO_V1(memcache_set);
 PG_FUNCTION_INFO_V1(memcache_set_absexpire);
+PG_FUNCTION_INFO_V1(memcache_prepend);
+PG_FUNCTION_INFO_V1(memcache_prepend_absexpire);
+PG_FUNCTION_INFO_V1(memcache_append);
+PG_FUNCTION_INFO_V1(memcache_append_absexpire);
 PG_FUNCTION_INFO_V1(memcache_stats);
 PG_FUNCTION_INFO_V1(memcache_stat);
 

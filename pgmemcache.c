@@ -54,25 +54,32 @@ static struct memcache_global globals;
 
 /* Custom GUC variable */
 static char *memcache_default_servers;
-
-static const char *assign_default_servers_guc(const char *newval,
-                                              bool doit, GucSource source);
-static const char *show_default_servers_guc(void);
-static Datum       memcache_atomic_op(bool increment, PG_FUNCTION_ARGS);
-static Datum       memcache_set_cmd(int type, PG_FUNCTION_ARGS);
+static char *memcache_default_behavior;
+static GucStringAssignHook assign_default_servers_guc(const char *newval,
+                                                      bool doit, GucSource source);
+static GucStringAssignHook assign_default_behavior_guc (const char *newval,
+                                                        bool doit, GucSource source);
+static GucStringAssignHook assign_default_behavior (const char *newval);
+static GucShowHook show_default_servers_guc (void);
+static GucShowHook show_default_behavior_guc (void);
+static memcached_behavior get_memcached_behavior_flag (const char *flag);
+static uint64_t get_memcached_behavior_data (const char *flag, const char *data);
+static uint64_t get_memcached_hash_type (const char *data);
+static uint64_t get_memcached_distribution_type (const char *data);
+static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS);
+static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(char *host_str);
-static bool        do_memcache_set_cmd(int type, char *key, size_t key_len,
-                                       char *val, size_t val_len, time_t expire);
-static time_t      interval_to_time_t(Interval *span);
+static bool do_memcache_set_cmd(int type, char *key, size_t key_len,
+                                char *val, size_t val_len, time_t expire);
+static time_t interval_to_time_t(Interval *span);
 
-#define PG_MEMCACHE_ADD					0x0001
-#define PG_MEMCACHE_REPLACE				0x0002
-#define PG_MEMCACHE_SET					0x0004
-#define PG_MEMCACHE_PREPEND                             0x0008
-#define PG_MEMCACHE_APPEND                              0x0010
-
-#define PG_MEMCACHE_TYPE_INTERVAL		0x0100
-#define PG_MEMCACHE_TYPE_TIMESTAMP              0x0200
+#define PG_MEMCACHE_ADD                 0x0001
+#define PG_MEMCACHE_REPLACE             0x0002
+#define PG_MEMCACHE_SET                 0x0004
+#define PG_MEMCACHE_PREPEND             0x0008
+#define PG_MEMCACHE_APPEND              0x0010
+#define PG_MEMCACHE_TYPE_INTERVAL       0x0100
+#define PG_MEMCACHE_TYPE_TIMESTAMP      0x0200
 
 void
 _PG_init(void)
@@ -87,7 +94,6 @@ _PG_init(void)
 
     old_ctxt = MemoryContextSwitchTo(globals.pg_ctxt);
     globals.mc = memcached_create(NULL);
-	memcached_behavior_set(globals.mc, MEMCACHED_BEHAVIOR_VERIFY_KEY, 1);
 	
     MemoryContextSwitchTo(old_ctxt);
 
@@ -95,25 +101,124 @@ _PG_init(void)
                                "Comma-separated list of memcached servers to connect to.",
                                "Specified as a comma-separated list of host:port (port is optional).",
                                &memcache_default_servers,
+#if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
                                NULL,
-                               PGC_USERSET, 
+#endif
+                               PGC_USERSET,
+#if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
                                GUC_LIST_INPUT,
+#endif
                                assign_default_servers_guc,
                                show_default_servers_guc);
+    
+    DefineCustomStringVariable ("pgmemcache.default_behavior",
+                                "Comma-separated list of memcached behavior (optional).",
+                                "Specified as a comma-separated list of behavior_flag:behavior_data.",
+                                &memcache_default_behavior,
+#if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
+                                NULL,
+#endif
+                                PGC_USERSET,
+#if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
+                                GUC_LIST_INPUT,
+#endif
+                                assign_default_behavior_guc,
+                                show_default_behavior_guc);
 }
 
-static const char *
+
+static GucStringAssignHook
 assign_default_servers_guc(const char *newval, bool doit, GucSource source)
 {
-	do_server_add((char *) newval);
-    return newval;
+    do_server_add((char *) newval);
+    return (GucStringAssignHook) newval;
 }
 
-static const char *
+static GucShowHook
 show_default_servers_guc(void)
 {
-    return memcache_default_servers;
+    return (GucShowHook) memcache_default_servers;
 }
+
+static GucStringAssignHook
+assign_default_behavior_guc (const char *newval, bool doit, GucSource source)
+{
+    return assign_default_behavior (newval);
+}
+
+static GucShowHook
+show_default_behavior_guc (void)
+{
+    return (GucShowHook) memcache_default_behavior;
+}
+
+static GucStringAssignHook
+assign_default_behavior (const char *newval)
+{
+    int i, len;
+    StringInfoData flag_buf;
+    StringInfoData data_buf;
+    memcached_return rc;
+    MemoryContext old_ctx;
+
+    old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
+
+    initStringInfo (&flag_buf);
+    initStringInfo (&data_buf);
+
+    len = strlen (newval);
+
+    for (i = 0; i < len; i++) 
+    {
+        char c = newval[i];
+
+        if (c == ',' || c == ':') 
+        {
+            if (flag_buf.len == 0)
+                return NULL;
+
+            if (c == ':') {
+                int j;
+                for (j = i + 1; j < len; j++)
+                {
+                    if (newval[j] == ',')
+                        break;
+                    appendStringInfoChar (&data_buf, newval[j]);
+                }
+
+                if (data_buf.len == 0)
+                    return NULL;
+
+                i += data_buf.len;
+            }
+
+            rc = memcached_behavior_set (globals.mc,
+                                         get_memcached_behavior_flag
+                                         (flag_buf.data),
+                                         get_memcached_behavior_data
+                                         (flag_buf.data, data_buf.data));
+
+            /* Skip the element separator, reset buffers */
+            i++;
+            flag_buf.data[0] = '\0';
+            flag_buf.len = 0;
+            data_buf.data[0] = '\0';
+            data_buf.len = 0;
+        }
+        else 
+        {
+            appendStringInfoChar (&flag_buf, c);
+        }
+    }
+
+    pfree (flag_buf.data);
+    pfree (data_buf.data);
+
+    MemoryContextSwitchTo(old_ctx);
+
+    return (GucStringAssignHook) newval;
+}
+
 
 /*
  * This is called when we're being unloaded from a process. Note that
@@ -332,7 +437,6 @@ memcache_append_absexpire(PG_FUNCTION_ARGS)
     return memcache_set_cmd(PG_MEMCACHE_APPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
-
 static Datum
 memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 {
@@ -416,6 +520,12 @@ do_memcache_set_cmd(int type, char *key, size_t key_length,
     else if (type & PG_MEMCACHE_APPEND)
 		rc = memcached_append (globals.mc, key, key_length,
 							value, value_length, expiration, 0);
+    else if (type & PG_MEMCACHE_PREPEND)
+		rc = memcached_prepend (globals.mc, key, key_length,
+							value, value_length, expiration, 0);
+    else if (type & PG_MEMCACHE_APPEND)
+		rc = memcached_append (globals.mc, key, key_length,
+							value, value_length, expiration, 0);
     else
         elog(ERROR, "unknown pgmemcache set command type: %d", type);
 
@@ -458,6 +568,150 @@ do_server_add(char *host_str)
 	return rc;
 }
 
+static memcached_behavior
+get_memcached_behavior_flag (const char *flag)
+{
+    memcached_behavior ret = -1;
+
+    /*Sort by flag in reverse order. */
+    if (strncmp ("MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY", flag, 39) == 0 || strncmp ("HASH_WITH_PREFIX_KEY", flag, 21) == 0)
+        ret = MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_VERIFY_KEY", flag, 29) == 0 || strncmp ("VERIFY_KEY", flag, 10) == 0)
+        ret = MEMCACHED_BEHAVIOR_VERIFY_KEY;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_USER_DATA", flag, 28) == 0 || strncmp ("USER_DATA", flag, 9) == 0)
+        ret = MEMCACHED_BEHAVIOR_USER_DATA;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_TCP_NODELAY", flag, 30) == 0 || strncmp ("TCP_NODELAY", flag, 11) == 0)
+        ret = MEMCACHED_BEHAVIOR_TCP_NODELAY;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SUPPORT_CAS", flag, 30) == 0 || strncmp ("SUPPORT_CAS", flag, 11) == 0)
+        ret = MEMCACHED_BEHAVIOR_SUPPORT_CAS;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SORT_HOSTS", flag, 29) == 0 || strncmp ("SORT_HOSTS", flag, 10) == 0)
+        ret = MEMCACHED_BEHAVIOR_SORT_HOSTS;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE", flag, 35) == 0 || strncmp ("SOCKET_SEND_SIZE", flag, 16) == 0)
+        ret = MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE", flag, 35) == 0 || strncmp ("SOCKET_RECV_SIZE", flag, 16) == 0)
+        ret = MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SND_TIMEOUT", flag, 30) == 0 || strncmp ("SND_TIMEOUT", flag, 11) == 0)
+        ret = MEMCACHED_BEHAVIOR_SND_TIMEOUT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT", flag, 39) == 0 || strncmp ("SERVER_FAILURE_LIMIT", flag, 20) == 0)
+        ret = MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_RETRY_TIMEOUT", flag, 32) == 0 || strncmp ("RETRY_TIMEOUT", flag, 13) == 0)
+        ret = MEMCACHED_BEHAVIOR_RETRY_TIMEOUT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_RCV_TIMEOUT", flag, 30) == 0 || strncmp ("RCV_TIMEOUT", flag, 11) == 0)
+        ret = MEMCACHED_BEHAVIOR_RCV_TIMEOUT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_POLL_TIMEOUT", flag, 31) == 0 || strncmp ("POLL_TIMEOUT", flag, 12) == 0)
+        ret = MEMCACHED_BEHAVIOR_POLL_TIMEOUT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_NO_BLOCK", flag, 27) == 0 || strncmp ("NO_BLOCK", flag, 8) == 0)
+        ret = MEMCACHED_BEHAVIOR_NO_BLOCK;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED", flag, 34) == 0 || strncmp ("KETAMA_WEIGHTED", flag, 15) == 0)
+        ret = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_HASH", flag, 30) == 0 || strncmp ("KETAMA_HASH", flag, 11) == 0)
+        ret = MEMCACHED_BEHAVIOR_KETAMA_HASH;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA", flag, 25) == 0 || strncmp ("KETAMA", flag, 6) == 0)
+        ret = MEMCACHED_BEHAVIOR_KETAMA;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK", flag, 35) == 0 || strncmp ("IO_MSG_WATERMARK", flag, 16) == 0)
+        ret = MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK", flag, 37) == 0 || strncmp ("IO_BYTES_WATERMARK", flag, 18) == 0)
+        ret = MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_HASH", flag, 23) == 0 || strncmp ("HASH", flag, 4) == 0)
+        ret = MEMCACHED_BEHAVIOR_HASH;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_DISTRIBUTION", flag, 31) == 0 || strncmp ("DISTRIBUTION", flag, 12) == 0)
+        ret = MEMCACHED_BEHAVIOR_DISTRIBUTION;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT", flag, 34) == 0 || strncmp ("CONNECT_TIMEOUT", flag, 15) == 0)
+        ret = MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_CACHE_LOOKUPS", flag, 33) == 0 || strncmp ("CACHE_LOOKUPS", flag, 14) == 0)
+        ret = MEMCACHED_BEHAVIOR_CACHE_LOOKUPS;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_BUFFER_REQUESTS", flag, 34) == 0 || strncmp ("BUFFER_REQUESTS", flag, 15) == 0)
+        ret = MEMCACHED_BEHAVIOR_BUFFER_REQUESTS;
+    else if (strncmp ("MEMCACHED_BEHAVIOR_BINARY_PROTOCOL", flag, 34) == 0 || strncmp ("BINARY_PROTOCOL", flag, 15) == 0)
+        ret = MEMCACHED_BEHAVIOR_BINARY_PROTOCOL;
+    else
+        elog (ERROR, "unknown memcached behavior flag: %s", flag);
+
+    return ret;
+}
+
+static uint64_t
+get_memcached_behavior_data (const char *flag, const char *data)
+{
+    char *endptr;
+    memcached_behavior f_code = get_memcached_behavior_flag (flag);
+    uint64_t ret;
+
+    switch (f_code) 
+    {
+        case MEMCACHED_BEHAVIOR_HASH:
+        case MEMCACHED_BEHAVIOR_KETAMA_HASH:
+            ret = get_memcached_hash_type (data);
+            break;
+        case MEMCACHED_BEHAVIOR_DISTRIBUTION:
+            ret = get_memcached_distribution_type (data);
+            break;
+        default:
+            ret = strtol (data, &endptr, 10);
+            if (endptr == data)
+                elog (ERROR, "invalid memcached behavior param %s: %s", flag, data);
+    }
+    
+    return ret;
+}
+
+static uint64_t
+get_memcached_hash_type (const char *data)
+{
+    uint64_t ret;
+
+    /* Sort by data in reverse order. */
+    if (strncmp ("MEMCACHED_HASH_MURMUR", data, 21) == 0 || strncmp ("MURMUR", data, 6) == 0)
+        ret = MEMCACHED_HASH_MURMUR;
+    else if (strncmp ("MEMCACHED_HASH_MD5", data, 18) == 0 || strncmp ("MD5", data, 3) == 0)
+        ret = MEMCACHED_HASH_MD5;
+    else if (strncmp ("MEMCACHED_HASH_JENKINS", data, 22) == 0 || strncmp ("JENKINS", data, 7) == 0)
+        ret = MEMCACHED_HASH_JENKINS;
+    else if (strncmp ("MEMCACHED_HASH_HSIEH", data, 20) == 0 || strncmp ("HSIEH", data, 5) == 0)
+        ret = MEMCACHED_HASH_HSIEH;
+    else if (strncmp ("MEMCACHED_HASH_FNV1A_64", data, 23) == 0 || strncmp ("FNV1A_64", data, 8) == 0)
+        ret = MEMCACHED_HASH_FNV1A_64;
+    else if (strncmp ("MEMCACHED_HASH_FNV1A_32", data, 23) == 0 || strncmp ("FNV1A_32", data, 8) == 0)
+        ret = MEMCACHED_HASH_FNV1A_32;
+    else if (strncmp ("MEMCACHED_HASH_FNV1_64", data, 22) == 0 || strncmp ("FNV1_64", data, 7) == 0)
+        ret = MEMCACHED_HASH_FNV1_64;
+    else if (strncmp ("MEMCACHED_HASH_FNV1_32", data, 22) == 0 || strncmp ("FNV1_32", data, 7) == 0)
+        ret = MEMCACHED_HASH_FNV1_32;
+    else if (strncmp ("MEMCACHED_HASH_DEFAULT", data, 22) == 0 || strncmp ("DEFAULT", data, 7) == 0)
+        ret = MEMCACHED_HASH_DEFAULT;
+    else if (strncmp ("MEMCACHED_HASH_CRC", data, 18) == 0 || strncmp ("CRC", data, 3) == 0)
+        ret = MEMCACHED_HASH_CRC;
+    else 
+    {
+        ret = 0xffffffff; /* to avoid warning */
+        elog (ERROR, "invalid hash name: %s", data);
+    }
+    
+    return ret;
+}
+
+static uint64_t
+get_memcached_distribution_type (const char *data)
+{
+    uint64_t ret;
+
+    /* Sort by data in reverse order. */
+    if (strncmp ("MEMCACHED_DISTRIBUTION_RANDOM", data, 29) == 0 || strncmp ("RANDOM", data, 6) == 0)
+        ret = MEMCACHED_DISTRIBUTION_RANDOM;
+    else if (strncmp ("MEMCACHED_DISTRIBUTION_MODULA", data, 29) == 0 || strncmp ("MODULA", data, 6) == 0)
+        ret = MEMCACHED_DISTRIBUTION_MODULA;
+    else if (strncmp ("MEMCACHED_DISTRIBUTION_CONSISTENT_KETAMA", data, 40) == 0 || strncmp ("CONSISTENT_KETAMA", data, 17) == 0)
+        ret = MEMCACHED_DISTRIBUTION_CONSISTENT_KETAMA;
+    else if (strncmp ("MEMCACHED_DISTRIBUTION_CONSISTENT", data, 33) == 0 || strncmp ("CONSISTENT", data, 10) == 0)
+        ret = MEMCACHED_DISTRIBUTION_CONSISTENT;
+    else 
+    {
+        ret = 0xffffffff; /* to avoid warning */
+        elog (ERROR, "invalid distribution name: %s", data);
+    }
+
+    return ret;
+}
 
 Datum
 memcache_stats(PG_FUNCTION_ARGS)
