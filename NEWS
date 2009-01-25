@@ -1,3 +1,11 @@
+pgmemcache 2.0 beta2
+====================
+On the way towards a 2.0 release:
+
+* Make pgmemcache work on top of older versions of PostgreSQL (at least 8.3, probably earlier)
+* Make libmemcached behavior configurable through PostgreSQL GUCs.
+* prepend/append support
+
 pgmemcache 2.0 beta1
 ====================
 
