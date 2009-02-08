@@ -20,15 +20,25 @@ REQUIREMENTS:
 INSTALLATION:
 =============
 
-	In the instructions below, substitute 'gmake' with whatever GNU
-	make's name is on your platform (normally gmake, gnumake, or
-	make). The Makefile assumes that the pg_config binary is in the
-	current PATH; if it isn't, you should modify your PATH (or edit
-	the Makefile).
+1) Install PostgreSQL with PGXS (if not already installed).
 
-	% gmake
-	% sudo gmake install
+2) Install libmemcached.
 
+3) If necessary, update LD_LIBRARY_CACHE for the PostgreSQL server owner and restart PostgreSQL.
+
+4) Switch to the PostgreSQL server owner and make sure that the pg_config binary is in your PATH (or edit
+the Makefile).
+
+5) Build pgmemcache:
+
+In the instructions below, substitute 'gmake' with whatever GNU
+make's name is on your platform (normally gmake, gnumake, or
+make). 
+
+% gmake
+% sudo gmake install
+
+6) Run SETUP below for each database in which you want to use pgmemcache.
 
 SETUP:
 ======
