@@ -306,7 +306,7 @@ memcache_delete(PG_FUNCTION_ARGS)
 	
 	rc = memcached_delete(globals.mc, key, key_length, hold);
 	
-    if (rc != MEMCACHED_SUCCESS)
+    if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
         elog(ERROR, "%s ", memcached_strerror(globals.mc, rc));
 
     PG_RETURN_BOOL(rc == 0);
