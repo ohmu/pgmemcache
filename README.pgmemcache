@@ -234,11 +234,17 @@ HISTORY:
 pgmemcache was originally written by Sean Chittenden. During version
 1.1 times it was maintained by Neil Conway. Since version 2.0 pgmemcache
 was rewritten to work on top of libmemcached and the maintainership 
-moved to Hannu Valtonen. 
+moved to Hannu Valtonen.
 
 During version 1.x series starting from 1.1, development of pgmemcache 
 was sponsored by the Open Technology Group, Inc. (OTG). 
 OTG provides training in a wide range of open source software, including 
 pgmemcache and PostgreSQL training. For more information, see http://www.otg-nc.com/
+
+THANKS:
+=======
+
+Suzuki Hironobu contributed major patches for the 2.0 series, among other
+things, a support for libmemcached configuration settings.
 
 $PostgreSQL$
