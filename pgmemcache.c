@@ -53,8 +53,8 @@ struct memcache_global
 static struct memcache_global globals;
 
 /* Custom GUC variable */
-static char *memcache_default_servers;
-static char *memcache_default_behavior;
+static char *memcache_default_servers = "";
+static char *memcache_default_behavior = "";
 static GucStringAssignHook assign_default_servers_guc(const char *newval,
                                                       bool doit, GucSource source);
 static GucStringAssignHook assign_default_behavior_guc (const char *newval,
