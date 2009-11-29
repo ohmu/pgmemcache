@@ -108,8 +108,8 @@ _PG_init(void)
 #if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
                                GUC_LIST_INPUT,
 #endif
-                               assign_default_servers_guc,
-                               show_default_servers_guc);
+                               (GucStringAssignHook) assign_default_servers_guc,
+                               (GucShowHook) show_default_servers_guc);
     
     DefineCustomStringVariable ("pgmemcache.default_behavior",
                                 "Comma-separated list of memcached behavior (optional).",
@@ -122,8 +122,8 @@ _PG_init(void)
 #if defined(PG_VERSION_NUM) && (80400 <= PG_VERSION_NUM)
                                 GUC_LIST_INPUT,
 #endif
-                                assign_default_behavior_guc,
-                                show_default_behavior_guc);
+                                (GucStringAssignHook) assign_default_behavior_guc,
+                                (GucShowHook) show_default_behavior_guc);
 }
 
 
