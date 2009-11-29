@@ -80,7 +80,6 @@ static time_t interval_to_time_t(Interval *span);
 #define PG_MEMCACHE_APPEND              0x0010
 #define PG_MEMCACHE_TYPE_INTERVAL       0x0100
 #define PG_MEMCACHE_TYPE_TIMESTAMP      0x0200
-#define PG_MEMCACHE_BYTEA_KEY           0x0300
 
 void
 _PG_init(void)
@@ -236,7 +235,6 @@ memcache_add(PG_FUNCTION_ARGS)
 {
     return memcache_set_cmd(PG_MEMCACHE_ADD | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
-
 
 Datum
 memcache_add_absexpire(PG_FUNCTION_ARGS)
@@ -439,7 +437,6 @@ static Datum
 memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 {
     text *key = NULL, *val;
-    bytea *bytea_key = NULL;
     size_t key_length, val_length;
     time_t expire;
     TimestampTz timestamptz;
@@ -451,15 +448,9 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS)
       elog(ERROR, "memcache key cannot be NULL");
     if (PG_ARGISNULL(1))
       elog(ERROR, "memcache value cannot be NULL");
-    if (type & PG_MEMCACHE_BYTEA_KEY)
-    {				       
-      bytea_key = PG_GETARG_BYTEA_P(0);
-      key_length = VARSIZE(bytea_key) - VARHDRSZ;
-    }
-    else {				       
-      key = PG_GETARG_TEXT_P(0);
-      key_length = VARSIZE(key) - VARHDRSZ;
-    }
+
+    key = PG_GETARG_TEXT_P(0);
+    key_length = VARSIZE(key) - VARHDRSZ;
 
     /* These aren't really needed as we set libmemcached behavior to check for all invalid sets */
     if (key_length < 1)
@@ -498,10 +489,7 @@ memcache_set_cmd(int type, PG_FUNCTION_ARGS)
             elog(ERROR, "%s():%s:%u: invalid date type", __FUNCTION__, __FILE__, __LINE__);
     }
 
-    if (type & PG_MEMCACHE_BYTEA_KEY)
-      ret = do_memcache_set_cmd(type, VARDATA(bytea_key), key_length, VARDATA(val), val_length, expire);
-    else
-      ret = do_memcache_set_cmd(type, VARDATA(key), key_length, VARDATA(val), val_length, expire);
+    ret = do_memcache_set_cmd(type, VARDATA(key), key_length, VARDATA(val), val_length, expire);
 
     PG_RETURN_BOOL(ret);
 }
