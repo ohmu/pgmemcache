@@ -8,7 +8,7 @@ have a few trivial requirements.
 REQUIREMENTS:
 =============
 
-*) libmemcache(3) 0.25 or newer; 0.25 is recommended
+*) libmemcache(3) 0.25 or newer; 0.35 is recommended
    
    http://tangent.org/552/libmemcached.html
 
@@ -69,7 +69,11 @@ SETUP:
     5. Set the pgmemcache.default_behavior flags to suit your needs. The format is a 
        comma-separated list of memcached behavior (optional) of behavior_flag:behavior_data.
        The flags correspond with libmemcached behavior flags. Check the libmemcached 
-       documentation for those.
+       documentation for those. As an example behavior you might have a line like:
+        
+       pgmemcache.default_behavior='BINARY_PROTOCOL:1'
+       
+       in your postgresql.conf
 
 
 USAGE:
@@ -121,11 +125,16 @@ memcache_delete(/* key */ TEXT)
 memcache_flush_all()
 	Flushes all data on all servers in the memcache cluster.
 
-value = memcache_get(/* key */ TEXT)
+value = memcache_get(TEXT)
 	Fetches a key out of the cache. Returns NULL if the key does not
 	exist; otherwise, it returns the value of the key as TEXT. Note
 	that zero-length values are allowed.
-memcache_get_multi (/*list of keys */ TEXT)
+
+memcache_get_multi (TEXT[])
+        Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
+        for the found keys, with the columns titled key and value.
+
+memcache_get_multi (BYTEA[])
         Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
         for the found keys, with the columns titled key and value.
 
@@ -248,6 +257,6 @@ THANKS:
 =======
 
 Suzuki Hironobu contributed major patches for the 2.0 series, among other
-things, a support for libmemcached configuration settings.
+things, support for libmemcached configuration settings.
 
 $PostgreSQL$

@@ -1,3 +1,11 @@
+pgmemcache 2.0.0
+===================
+Finally a 2.0.0 release. 
+
+* Fix default (unset) GUC crashes, based on a patch from Claes Jakobsson
+* Add BYTEA memcache_get
+* Add TEXT[], BYTEA[] memcache_get_multi for the reduction of server roundtrips
+
 pgmemcache 2.0 RC 1
 ===================
 It looks likely that this is the last release before stamping this as 2.0.
