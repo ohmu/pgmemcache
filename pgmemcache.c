@@ -345,32 +345,31 @@ Datum
 memcache_get(PG_FUNCTION_ARGS)
 {
     text *get_key, *ret;
-	char *string, *key;
+    char *string, *key;
     size_t key_length, return_value_length;
     uint32_t flags;
-	memcached_return rc;
+    memcached_return rc;
 
     if (PG_ARGISNULL(0))
-		elog(ERROR, "memcache key cannot be NULL");
+      elog(ERROR, "memcache key cannot be NULL");
 
     get_key = PG_GETARG_TEXT_P(0);
 	
-	key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
+    key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
     key_length = strlen(key);
 
-	if (key_length < 1)
-		elog(ERROR, "memcache key cannot be an empty string");
-	if (key_length >= 250)
-		elog(ERROR, "memcache key too long");
-
-	string = memcached_get(globals.mc, key, key_length,
-						   &return_value_length, &flags, &rc);
-	
-	if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
-		elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
-
-	if (rc == MEMCACHED_NOTFOUND)
-		PG_RETURN_NULL();
+    if (key_length < 1)
+      elog(ERROR, "memcache key cannot be an empty string");
+    if (key_length >= 250)
+      elog(ERROR, "memcache key too long");
+    
+    string = memcached_get(globals.mc, key, key_length, &return_value_length, &flags, &rc);
+    
+    if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
+      elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+    
+    if (rc == MEMCACHED_NOTFOUND)
+      PG_RETURN_NULL();
 
     ret = (text *) palloc(return_value_length + VARHDRSZ);
     SET_VARSIZE(ret, return_value_length + VARHDRSZ);
@@ -378,7 +377,111 @@ memcache_get(PG_FUNCTION_ARGS)
 
     PG_RETURN_TEXT_P(ret);
 }
- 
+
+Datum
+memcache_get_multi(PG_FUNCTION_ARGS)
+{
+    ArrayType  *array;
+    int array_length, array_lbound, i;
+    Oid element_type;
+    uint32_t flags;
+    memcached_return rc;
+    char		typalign;
+    int16		typlen;
+    bool		typbyval;    
+    char **keys, *value;
+    size_t *key_lens, value_length;
+    FuncCallContext *funcctx;
+    MemoryContext oldcontext;
+    internal_fctx *fctx;
+    TupleDesc            tupdesc;
+    AttInMetadata       *attinmeta;
+
+    if (PG_ARGISNULL(0))
+      elog(ERROR, "memcache get_multi key cannot be null");
+    
+    array = PG_GETARG_ARRAYTYPE_P(0);
+    if (ARR_NDIM(array) != 1)
+      elog(ERROR, "pgmemcache only supports single dimension ARRAYs, not: ARRAYs with %d dimensions", ARR_NDIM(array));
+    
+    array_lbound = ARR_LBOUND(array)[0];
+    array_length = ARR_DIMS(array)[0];
+    element_type = ARR_ELEMTYPE(array);
+
+    if (SRF_IS_FIRSTCALL())
+    {
+                /* create a function context for cross-call persistence */
+                funcctx = SRF_FIRSTCALL_INIT();
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+                funcctx->max_calls = array_length;
+		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+		  ereport(ERROR,
+                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                     errmsg("function returning record called in context that cannot accept type record")));
+                fctx = (internal_fctx *) palloc(sizeof(internal_fctx));
+
+		get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
+    
+		keys = palloc(sizeof(char *) * array_length);
+		key_lens = palloc(sizeof(size_t) * array_length);
+	       
+		for (i = 0;i < array_length;i++) {
+		  int offset = array_lbound + i;
+		  bool isnull;
+		  Datum elem;
+		  
+		  elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
+		  if(!isnull) {
+		    keys[i] = TextDatumGetCString(PointerGetDatum(elem));
+		    key_lens[i] = strlen(keys[i]);
+		  }
+		}
+		fctx->keys = keys;
+		fctx->key_lens = key_lens;
+
+		rc = memcached_mget(globals.mc, (const char **)keys, key_lens, array_length);
+		if (rc != MEMCACHED_SUCCESS)
+		  elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+		
+		if (rc == MEMCACHED_NOTFOUND)
+		  PG_RETURN_NULL();
+		
+		attinmeta = TupleDescGetAttInMetadata(tupdesc);
+		funcctx->attinmeta = attinmeta;
+		funcctx->user_fctx = fctx;
+                MemoryContextSwitchTo(oldcontext);
+    }
+    
+    funcctx = SRF_PERCALL_SETUP();
+    fctx = funcctx->user_fctx;
+    attinmeta = funcctx->attinmeta;
+
+    if ((value = memcached_fetch(globals.mc, fctx->keys[funcctx->call_cntr], &fctx->key_lens[funcctx->call_cntr], &value_length, &flags, &rc)) != NULL) {
+      char       **values;
+      HeapTuple    tuple;
+      Datum        result;
+
+      if (value == NULL && rc == MEMCACHED_END) 
+	SRF_RETURN_DONE(funcctx);
+      else if (rc != MEMCACHED_SUCCESS) {
+	elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+	SRF_RETURN_DONE(funcctx);
+      }
+      values = (char **) palloc(2 * sizeof(char *));
+      values[0] = (char *) palloc(fctx->key_lens[funcctx->call_cntr] * sizeof(char));
+      values[1] = (char *) palloc(value_length * sizeof(char));
+
+      snprintf(values[0], fctx->key_lens[funcctx->call_cntr] + 1, "%s", fctx->keys[funcctx->call_cntr]);
+      snprintf(values[1], value_length + 1, "%s", value);
+
+      tuple = BuildTupleFromCStrings(attinmeta, values);
+      result = HeapTupleGetDatum(tuple);
+
+      SRF_RETURN_NEXT(funcctx, result);
+    }
+    SRF_RETURN_DONE(funcctx);
+}
+
 Datum
 memcache_incr(PG_FUNCTION_ARGS)
 {

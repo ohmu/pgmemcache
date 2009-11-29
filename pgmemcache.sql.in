@@ -28,10 +28,17 @@ CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
 
 
--- $1 = key - TEXT
 CREATE OR REPLACE FUNCTION memcache_get(TEXT) RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_get' LANGUAGE 'C';
 
+CREATE OR REPLACE FUNCTION memcache_get(BYTEA) RETURNS TEXT
+AS 'MODULE_PATHNAME', 'memcache_get' LANGUAGE 'C';
+
+CREATE OR REPLACE FUNCTION memcache_get_multi(IN TEXT[], OUT key TEXT, OUT value TEXT) RETURNS SETOF record
+AS 'MODULE_PATHNAME', 'memcache_get_multi' LANGUAGE 'C';
+
+CREATE OR REPLACE FUNCTION memcache_get_multi(IN BYTEA[], OUT key TEXT, OUT value TEXT) RETURNS SETOF record
+AS 'MODULE_PATHNAME', 'memcache_get_multi' LANGUAGE 'C';
 
 -- $1 = key - TEXT
 -- $2 = decrement - INT4, default 1 (opt)

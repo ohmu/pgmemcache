@@ -34,6 +34,7 @@ Datum memcache_decr(PG_FUNCTION_ARGS);
 Datum memcache_delete(PG_FUNCTION_ARGS);
 Datum memcache_flush_all0(PG_FUNCTION_ARGS);
 Datum memcache_get(PG_FUNCTION_ARGS);
+Datum memcache_get_multi(PG_FUNCTION_ARGS);
 Datum memcache_incr(PG_FUNCTION_ARGS);
 Datum memcache_replace(PG_FUNCTION_ARGS);
 Datum memcache_replace_absexpire(PG_FUNCTION_ARGS);
@@ -53,6 +54,7 @@ PG_FUNCTION_INFO_V1(memcache_decr);
 PG_FUNCTION_INFO_V1(memcache_delete);
 PG_FUNCTION_INFO_V1(memcache_flush_all0);
 PG_FUNCTION_INFO_V1(memcache_get);
+PG_FUNCTION_INFO_V1(memcache_get_multi);
 PG_FUNCTION_INFO_V1(memcache_incr);
 PG_FUNCTION_INFO_V1(memcache_replace);
 PG_FUNCTION_INFO_V1(memcache_replace_absexpire);
@@ -67,3 +69,9 @@ PG_FUNCTION_INFO_V1(memcache_stats);
 PG_FUNCTION_INFO_V1(memcache_stat);
 
 #endif
+
+typedef struct
+{
+  char **keys;
+  size_t *key_lens;
+} internal_fctx;

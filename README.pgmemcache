@@ -125,6 +125,9 @@ value = memcache_get(/* key */ TEXT)
 	Fetches a key out of the cache. Returns NULL if the key does not
 	exist; otherwise, it returns the value of the key as TEXT. Note
 	that zero-length values are allowed.
+memcache_get_multi (/*list of keys */ TEXT)
+        Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
+        for the found keys, with the columns titled key and value.
 
 newval = memcache_incr(/* key */ TEXT, /* increment */ INT4)
 newval = memcache_incr(/* key */ TEXT)
