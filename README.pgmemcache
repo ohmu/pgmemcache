@@ -89,22 +89,6 @@ memcache_server_add(/* hostname */ TEXT)
 	wrapped in an IF statement).  See the mc_init() example below for
 	ideas on how this is used.
 
-memcache_server_list() => SETOF (text, int4, text)
-    Returns a row describing each element of the server list:
-    hostname, port, and current status.
-
-memcache_server_remove(/* hostname */ TEXT, /* port */ TEXT)
-memcache_server_remove(/* hostname */ TEXT)
-    Disconnects from the specified server.
-
-memcache_server_find(/* hash */ INT4) => (TEXT, INT4)
-	Returns a tuple containing the hostname and port of the server
-	assigned to the specified hash value.
-
-memcache_server_find(/* key */ TEXT) => (TEXT, INT4)
-    Returns a tuple containing the hostname and port of the server
-    assigned to the specified key.
-
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMPTZ)
 memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
 memcache_add(/* key */ TEXT, /* value */ TEXT)
@@ -171,22 +155,7 @@ Most installations will need a few functions to allow pgmemcache to
 work correctly.  Here are a few example functions that should get most
 people off the ground and running:
 
--- The following function is required to build the server list.  This
--- function should be small as it will be called constantly.
--- memcache_init() returns FALSE if it did not need to perform any
--- memory initialization.  This allows us to only add servers if we're
--- setting up the global server list.  If you're having problems,
--- check your search_path for the memcache_*() functions and make sure
--- you add it to your environment.
 SET search_path = public;
-CREATE OR REPLACE FUNCTION mc_init() RETURNS VOID AS $
-BEGIN
-	IF memcache_init() THEN
-		PERFORM memcache_server_add('mc1.example.com:11211');
-		PERFORM memcache_server_add('mc2.example.com:11211');
-	END IF;
-	RETURN;
-END;$ LANGUAGE 'plpgsql';
 
 -- The following function is an example of a trigger function that is
 -- used to replace the value of something in the cache with its new
