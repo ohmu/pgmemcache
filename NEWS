@@ -1,3 +1,9 @@
+pgmemcache 2.0.1
+===================
+* Remove some deprecated documentation
+* Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks to Marc Munro for 
+pointing out the problem and a fix for it.
+
 pgmemcache 2.0.0
 ===================
 Finally a 2.0.0 release. 

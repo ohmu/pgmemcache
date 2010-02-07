@@ -24,6 +24,7 @@
 #include "utils/datetime.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
+#include "utils/lsyscache.h"
 
 #include "pgmemcache.h"
 
@@ -137,7 +138,7 @@ assign_default_servers_guc(const char *newval, bool doit, GucSource source)
 static GucShowHook
 show_default_servers_guc(void)
 {
-    return (GucShowHook) memcache_default_servers;
+    return (GucShowHook) memcache_default_servers ? (GucShowHook) memcache_default_servers: (GucShowHook)"";
 }
 
 static GucStringAssignHook
@@ -149,7 +150,7 @@ assign_default_behavior_guc (const char *newval, bool doit, GucSource source)
 static GucShowHook
 show_default_behavior_guc (void)
 {
-    return (GucShowHook) memcache_default_behavior;
+    return (GucShowHook) memcache_default_behavior ? (GucShowHook) memcache_default_servers: (GucShowHook) "";
 }
 
 static GucStringAssignHook
@@ -386,9 +387,9 @@ memcache_get_multi(PG_FUNCTION_ARGS)
     Oid element_type;
     uint32_t flags;
     memcached_return rc;
-    char		typalign;
-    int16		typlen;
-    bool		typbyval;    
+    char typalign;
+    int16 typlen;
+    bool typbyval;    
     char **keys, *value;
     size_t *key_lens, value_length;
     FuncCallContext *funcctx;
