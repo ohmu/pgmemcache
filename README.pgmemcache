@@ -8,7 +8,7 @@ have a few trivial requirements.
 REQUIREMENTS:
 =============
 
-*) libmemcache(3) 0.25 or newer; 0.35 is recommended
+*) libmemcached(3) 0.31 or newer; Latest is recommended
    
    http://tangent.org/552/libmemcached.html
 

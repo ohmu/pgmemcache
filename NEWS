@@ -3,6 +3,8 @@ pgmemcache 2.0.1
 * Remove some deprecated documentation
 * Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks to Marc Munro for 
 pointing out the problem and a fix for it.
+* Make libmemcached use PostgreSQL memory allocation routines. (requires libmemcached 0.31+), based on a patch from
+Peter Meszaros with some editorialization by Hannu Valtonen. Note this bumps up our libmemcached minimum requirement to 0.31.
 
 pgmemcache 2.0.0
 ===================

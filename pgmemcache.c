@@ -73,6 +73,10 @@ static memcached_return do_server_add(char *host_str);
 static bool do_memcache_set_cmd(int type, char *key, size_t key_len,
                                 char *val, size_t val_len, time_t expire);
 static time_t interval_to_time_t(Interval *span);
+static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t);
+static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *);
+static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t);
+static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t, const size_t);
 
 #define PG_MEMCACHE_ADD                 0x0001
 #define PG_MEMCACHE_REPLACE             0x0002
@@ -95,6 +99,14 @@ _PG_init(void)
 
     old_ctxt = MemoryContextSwitchTo(globals.pg_ctxt);
     globals.mc = memcached_create(NULL);
+
+    if (memcached_set_memory_allocators(globals.mc,
+					pgmemcached_malloc,
+					pgmemcached_free,
+					pgmemcached_realloc,
+					pgmemcached_calloc) != MEMCACHED_SUCCESS) {
+      elog(ERROR, "pgmemcache: unable to set memory allocators");
+    }
 	
     MemoryContextSwitchTo(old_ctxt);
 
@@ -126,6 +138,28 @@ _PG_init(void)
                                 (GucStringAssignHook) assign_default_behavior_guc,
                                 (GucShowHook) show_default_behavior_guc);
 }
+
+static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t size)
+{
+  return MemoryContextAllocZero(globals.pg_ctxt, size);
+}
+
+static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem)
+{
+  pfree(mem);
+}
+
+static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size)
+{
+  /* postgresql repalloc() fails if 'mem' is NULL */
+  return mem ? repalloc(mem, (Size)size) : MemoryContextAllocZero(globals.pg_ctxt, size);
+}
+
+static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size)
+{
+  return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
+}
+
 
 
 static GucStringAssignHook
@@ -845,9 +879,9 @@ memcache_stats(PG_FUNCTION_ARGS)
 			memcached_return rc;
 			char *value = memcached_stat_get_value(globals.mc, &stat[i], *ptr, &rc);
 			appendStringInfo(&buf, "%s: %s\n", *ptr, value);
-			free(value);
+			pfree(value);
 		}
-		free(list);
+		pfree(list);
 	}
 	
 	PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
@@ -857,12 +891,12 @@ Datum
 memcache_stat(PG_FUNCTION_ARGS)
 {
     text *stat = PG_GETARG_TEXT_P(0);
-	memcached_stat_st *stats;
+    memcached_stat_st *stats;
     char *key, *return_value = NULL;
     size_t key_length;
     StringInfoData buf;
-	unsigned int i;
-	memcached_return rc;
+    unsigned int i;
+    memcached_return rc;
 	
     initStringInfo(&buf);
     key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(stat)));
@@ -882,7 +916,7 @@ memcache_stat(PG_FUNCTION_ARGS)
 	
 		if (return_value)
 			appendStringInfo(&buf, "%s: %s", key, return_value);
-			free(return_value);
+			pfree(return_value);
 
     PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
 }
