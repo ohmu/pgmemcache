@@ -159,40 +159,39 @@ SET search_path = public;
 -- The following function is an example of a trigger function that is
 -- used to replace the value of something in the cache with its new
 -- value.
-CREATE OR REPLACE FUNCTION auth_passwd_trg_upd() RETURNS TRIGGER AS $
+CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
 BEGIN
 	IF OLD.passwd != NEW.passwd THEN
 		PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
 	END IF;
 	RETURN NEW;
-END;$ LANGUAGE 'plpgsql';
+END;
+$$ LANGUAGE 'plpgsql';
 
 -- Activate the trigger for UPDATEs
-CREATE TRIGGER auth_passwd_upd_trg
-	AFTER UPDATE ON passwd
-	FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
+CREATE TRIGGER auth_passwd_upd_trg AFTER UPDATE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
 
 -- The above is not transaction safe, however.  A better approach is
 -- to have pgmemcache invalidate the cached data, but not replace it.
-CREATE OR REPLACE FUNCTION auth_passwd_trg_upd() RETURNS TRIGGER  AS $
+CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER  AS $$
 BEGIN
 	IF OLD.passwd != NEW.passwd THEN
 		PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
 	END IF;
 	RETURN NEW;
-END;$ LANGUAGE 'plpgsql';
+END;
+$$ LANGUAGE 'plpgsql';
 
 -- Here's an example delete trigger
-CREATE OR REPLACE FUNCTION auth_passwd_trg_del() RETURNS TRIGGER AS $
+CREATE OR REPLACE FUNCTION auth_passwd_del() RETURNS TRIGGER AS $$
 BEGIN
 	PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
 	RETURN OLD;
-END;$ LANGUAGE 'plpgsql';
+END;
+$$ LANGUAGE 'plpgsql';
 
 -- Activate the trigger for DELETEs
-CREATE TRIGGER auth_passwd_del_trg
-	AFTER DELETE ON passwd
-	FOR EACH ROW EXECUTE PROCEDURE auth_passwd_del();
+CREATE TRIGGER auth_passwd_del_trg AFTER DELETE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_del();
 
 LICENSE:
 ========
