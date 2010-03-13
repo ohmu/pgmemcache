@@ -8,7 +8,7 @@ have a few trivial requirements.
 REQUIREMENTS:
 =============
 
-*) libmemcached(3) 0.31 or newer; Latest is recommended
+*) libmemcached(3) 0.38 or newer; Latest is recommended
    
    http://tangent.org/552/libmemcached.html
 
@@ -146,7 +146,6 @@ stats = memcache_stats()
 
 stat = memcache_stats(/* statistic key */ TEXT)
 	Returns a specific statistic as a TEXT value.
-
 
 EXAMPLES:
 =========

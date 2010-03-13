@@ -1,3 +1,8 @@
+pgmemcache 2.0.2
+===================
+* Make pgmemcache work with libmemcached 0.38 memory allocators.
+This bumps up pgmemcache's libmemcached requirement up to 0.38.
+
 pgmemcache 2.0.1
 ===================
 * Remove some deprecated documentation
