@@ -73,10 +73,10 @@ static memcached_return do_server_add(char *host_str);
 static bool do_memcache_set_cmd(int type, char *key, size_t key_len,
                                 char *val, size_t val_len, time_t expire);
 static time_t interval_to_time_t(Interval *span);
-static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t);
-static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *);
-static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t);
-static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t, const size_t);
+static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t, void *context);
+static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context);
+static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t, void *context);
+static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t, const size_t, void *context);
 
 #define PG_MEMCACHE_ADD                 0x0001
 #define PG_MEMCACHE_REPLACE             0x0002
@@ -104,7 +104,8 @@ _PG_init(void)
 				      pgmemcached_malloc,
 				      pgmemcached_free,
 				      pgmemcached_realloc,
-				      pgmemcached_calloc) != MEMCACHED_SUCCESS) {
+				      pgmemcached_calloc,
+				      NULL) != MEMCACHED_SUCCESS) {
     elog(ERROR, "pgmemcache: unable to set memory allocators");
   }
 	
@@ -139,28 +140,26 @@ _PG_init(void)
 			      (GucShowHook) show_default_behavior_guc);
 }
 
-static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t size)
+static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
 {
   return MemoryContextAllocZero(globals.pg_ctxt, size);
 }
 
-static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem)
+static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context)
 {
   pfree(mem);
 }
 
-static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size)
+static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size, void *context)
 {
   /* postgresql repalloc() fails if 'mem' is NULL */
   return mem ? repalloc(mem, (Size)size) : MemoryContextAllocZero(globals.pg_ctxt, size);
 }
 
-static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size)
+static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size, void *context)
 {
   return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
 }
-
-
 
 static GucStringAssignHook
 assign_default_servers_guc(const char *newval, bool doit, GucSource source)
