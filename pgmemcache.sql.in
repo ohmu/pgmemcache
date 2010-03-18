@@ -97,6 +97,9 @@ AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_set(BYTEA, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
 
+CREATE OR REPLACE FUNCTION memcache_set(TEXT, BYTEA) RETURNS BOOL
+AS 'MODULE_PATHNAME', 'memcache_set' LANGUAGE 'C';
+
 -- $1 = key - TEXT
 -- $2 = val - TEXT
 -- $3 = expire - INTERVAL or TIMESTAMPTZ (opt)
