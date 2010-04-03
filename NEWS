@@ -1,3 +1,8 @@
+pgmemcache 2.0.3
+===================
+* Add support for all libmemcached 0.38 behaviors (a few had been added since these were updated the last time)
+* Add preliminary Debian packaging support, documentation was updated a bit to reflect this.
+
 pgmemcache 2.0.2
 ===================
 * Make pgmemcache work with libmemcached 0.38 memory allocators.
