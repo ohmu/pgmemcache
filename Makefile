@@ -1,6 +1,6 @@
 #$PostgreSQL$
 MODULE_big = pgmemcache
-PGMC_VERSION = 2.0.2
+PGMC_VERSION = 2.0.3
 
 OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
@@ -15,3 +15,7 @@ include $(PGXS)
 # add an entry to NEWS.
 dist:
 	tar -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
+deb84:
+	sed -e s/PGVER/8.4/g < debian/packages.in > debian/packages
+	yada rebuild
+	debuild -uc -us -b
