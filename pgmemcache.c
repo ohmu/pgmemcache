@@ -706,58 +706,70 @@ get_memcached_behavior_flag (const char *flag)
   memcached_behavior ret = -1;
 
   /*Sort by flag in reverse order. */
-  if (strncmp ("MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY", flag, 39) == 0 || strncmp ("HASH_WITH_PREFIX_KEY", flag, 21) == 0)
+  if (strncmp("MEMCACHED_BEHAVIOR_USE_UDP", flag, 26) == 0 || strncmp("USE_UDP", flag, 7) == 0)
+    ret = MEMCACHED_BEHAVIOR_USE_UDP;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_NO_BLOCK", flag, 27) == 0 || strncmp ("NO_BLOCK", flag, 8) == 0)
+    ret = MEMCACHED_BEHAVIOR_NO_BLOCK;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_SND_TIMEOUT", flag, 30) == 0 || strncmp ("SND_TIMEOUT", flag, 11) == 0)
+    ret = MEMCACHED_BEHAVIOR_SND_TIMEOUT;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY", flag, 39) == 0 || strncmp ("HASH_WITH_PREFIX_KEY", flag, 21) == 0)
     ret = MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_VERIFY_KEY", flag, 29) == 0 || strncmp ("VERIFY_KEY", flag, 10) == 0)
-    ret = MEMCACHED_BEHAVIOR_VERIFY_KEY;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_USER_DATA", flag, 28) == 0 || strncmp ("USER_DATA", flag, 9) == 0)
-    ret = MEMCACHED_BEHAVIOR_USER_DATA;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_RCV_TIMEOUT", flag, 30) == 0 || strncmp ("RCV_TIMEOUT", flag, 11) == 0)
+    ret = MEMCACHED_BEHAVIOR_RCV_TIMEOUT;
   else if (strncmp ("MEMCACHED_BEHAVIOR_TCP_NODELAY", flag, 30) == 0 || strncmp ("TCP_NODELAY", flag, 11) == 0)
     ret = MEMCACHED_BEHAVIOR_TCP_NODELAY;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_HASH", flag, 23) == 0 || strncmp ("HASH", flag, 4) == 0)
+    ret = MEMCACHED_BEHAVIOR_HASH;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_DISTRIBUTION", flag, 31) == 0 || strncmp ("DISTRIBUTION", flag, 12) == 0)
+    ret = MEMCACHED_BEHAVIOR_DISTRIBUTION;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_CACHE_LOOKUPS", flag, 33) == 0 || strncmp ("CACHE_LOOKUPS", flag, 14) == 0)
+    ret = MEMCACHED_BEHAVIOR_CACHE_LOOKUPS;
   else if (strncmp ("MEMCACHED_BEHAVIOR_SUPPORT_CAS", flag, 30) == 0 || strncmp ("SUPPORT_CAS", flag, 11) == 0)
     ret = MEMCACHED_BEHAVIOR_SUPPORT_CAS;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA", flag, 25) == 0 || strncmp ("KETAMA", flag, 6) == 0)
+    ret = MEMCACHED_BEHAVIOR_KETAMA;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED", flag, 34) == 0 || strncmp ("KETAMA_WEIGHTED", flag, 15) == 0)
+    ret = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_HASH", flag, 30) == 0 || strncmp ("KETAMA_HASH", flag, 11) == 0)
+    ret = MEMCACHED_BEHAVIOR_KETAMA_HASH;
+  //  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_COMPAT", flag, 32) == 0 || strncmp ("KETAMA_COMPAT", flag, 13) == 0)
+    //    ret = MEMCACHED_BEHAVIOR_KETAMA_COMPAT;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_POLL_TIMEOUT", flag, 31) == 0 || strncmp ("POLL_TIMEOUT", flag, 12) == 0)
+    ret = MEMCACHED_BEHAVIOR_POLL_TIMEOUT;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_USER_DATA", flag, 28) == 0 || strncmp ("USER_DATA", flag, 9) == 0)
+    ret = MEMCACHED_BEHAVIOR_USER_DATA;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_BUFFER_REQUESTS", flag, 34) == 0 || strncmp ("BUFFER_REQUESTS", flag, 15) == 0)
+    ret = MEMCACHED_BEHAVIOR_BUFFER_REQUESTS;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_VERIFY_KEY", flag, 29) == 0 || strncmp ("VERIFY_KEY", flag, 10) == 0)
+    ret = MEMCACHED_BEHAVIOR_VERIFY_KEY;
   else if (strncmp ("MEMCACHED_BEHAVIOR_SORT_HOSTS", flag, 29) == 0 || strncmp ("SORT_HOSTS", flag, 10) == 0)
     ret = MEMCACHED_BEHAVIOR_SORT_HOSTS;
   else if (strncmp ("MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE", flag, 35) == 0 || strncmp ("SOCKET_SEND_SIZE", flag, 16) == 0)
     ret = MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE;
   else if (strncmp ("MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE", flag, 35) == 0 || strncmp ("SOCKET_RECV_SIZE", flag, 16) == 0)
     ret = MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_SND_TIMEOUT", flag, 30) == 0 || strncmp ("SND_TIMEOUT", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_SND_TIMEOUT;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT", flag, 39) == 0 || strncmp ("SERVER_FAILURE_LIMIT", flag, 20) == 0)
-    ret = MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT;
   else if (strncmp ("MEMCACHED_BEHAVIOR_RETRY_TIMEOUT", flag, 32) == 0 || strncmp ("RETRY_TIMEOUT", flag, 13) == 0)
     ret = MEMCACHED_BEHAVIOR_RETRY_TIMEOUT;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_RCV_TIMEOUT", flag, 30) == 0 || strncmp ("RCV_TIMEOUT", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_RCV_TIMEOUT;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_POLL_TIMEOUT", flag, 31) == 0 || strncmp ("POLL_TIMEOUT", flag, 12) == 0)
-    ret = MEMCACHED_BEHAVIOR_POLL_TIMEOUT;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_NO_BLOCK", flag, 27) == 0 || strncmp ("NO_BLOCK", flag, 8) == 0)
-    ret = MEMCACHED_BEHAVIOR_NO_BLOCK;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED", flag, 34) == 0 || strncmp ("KETAMA_WEIGHTED", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA_HASH", flag, 30) == 0 || strncmp ("KETAMA_HASH", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA_HASH;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_KETAMA", flag, 25) == 0 || strncmp ("KETAMA", flag, 6) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT", flag, 34) == 0 || strncmp ("CONNECT_TIMEOUT", flag, 15) == 0)
+    ret = MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_BINARY_PROTOCOL", flag, 34) == 0 || strncmp ("BINARY_PROTOCOL", flag, 15) == 0)
+    ret = MEMCACHED_BEHAVIOR_BINARY_PROTOCOL;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT", flag, 39) == 0 || strncmp ("SERVER_FAILURE_LIMIT", flag, 20) == 0)
+    ret = MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT;
   else if (strncmp ("MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK", flag, 35) == 0 || strncmp ("IO_MSG_WATERMARK", flag, 16) == 0)
     ret = MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK;
   else if (strncmp ("MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK", flag, 37) == 0 || strncmp ("IO_BYTES_WATERMARK", flag, 18) == 0)
     ret = MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_HASH", flag, 23) == 0 || strncmp ("HASH", flag, 4) == 0)
-    ret = MEMCACHED_BEHAVIOR_HASH;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_DISTRIBUTION", flag, 31) == 0 || strncmp ("DISTRIBUTION", flag, 12) == 0)
-    ret = MEMCACHED_BEHAVIOR_DISTRIBUTION;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT", flag, 34) == 0 || strncmp ("CONNECT_TIMEOUT", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_CACHE_LOOKUPS", flag, 33) == 0 || strncmp ("CACHE_LOOKUPS", flag, 14) == 0)
-    ret = MEMCACHED_BEHAVIOR_CACHE_LOOKUPS;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_BUFFER_REQUESTS", flag, 34) == 0 || strncmp ("BUFFER_REQUESTS", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_BUFFER_REQUESTS;
-  else if (strncmp ("MEMCACHED_BEHAVIOR_BINARY_PROTOCOL", flag, 34) == 0 || strncmp ("BINARY_PROTOCOL", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_BINARY_PROTOCOL;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_IO_KEY_PREFETCH", flag, 34) == 0 || strncmp ("IO_KEY_PREFETCH", flag, 15) == 0)
+    ret = MEMCACHED_BEHAVIOR_IO_KEY_PREFETCH;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_NOREPLY", flag, 26) == 0 || strncmp("NOREPLY", flag, 7) == 0)
+    ret = MEMCACHED_BEHAVIOR_NOREPLY;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_NUMBER_OF_REPLICAS", flag, 37) == 0 || strncmp("NUMBER_OF_REPLICAS", flag, 18) == 0)
+    ret = MEMCACHED_BEHAVIOR_NUMBER_OF_REPLICAS;
+  else if (strncmp ("MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ", flag, 41) == 0 || strncmp("RANDOMIZE_REPLICA_READ", flag, 22) == 0)
+    ret = MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ;
   else
-    elog (ERROR, "unknown memcached behavior flag: %s", flag);
+    elog (ERROR, "Unknown memcached behavior flag: %s", flag);
 
   return ret;
 }
