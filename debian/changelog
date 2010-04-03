@@ -1,0 +1,6 @@
+$PostgreSQL$
+pgmemcache (2.0.3) unstable; urgency=low
+
+  * v2.0.3
+
+ -- Hannu Valtonen <hannu.valtonen@hut.fi>  Sat, 02 Apr 2010 13:00:00 +0200

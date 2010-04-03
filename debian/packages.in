@@ -1,0 +1,29 @@
+## debian/packages for pgmemcache 2.x
+# $PostgreSQL$
+Source: pgmemcache
+Section: contrib/misc
+Priority: extra
+Maintainer: Hannu Valtonen <hannu.valtonen@hut.fi>
+Standards-Version: 3.6.2
+Description: libmemcached interface for PostgreSQL
+Copyright: .
+ Copyright 2010 Hannu Valtonen
+Build: sh
+ make
+Clean: sh
+ make clean || true
+Build-Depends: postgresql-server-dev-PGVER, flex | flex-old, bison, yada, libmemcached-dev, postgresql-server-dev-8.4, libpq-dev, devscripts
+
+
+Package: postgresql-pgmemcache-PGVER
+Architecture: any
+Conflicts: pgmemcache
+Replaces: pgmemcache
+Contains: unstripped
+Depends: []
+Description: memcached client functions for PostgreSQL
+ .
+Install: sh
+ make install DESTDIR=$ROOT
+
+
