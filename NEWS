@@ -1,3 +1,7 @@
+pgmemcache 2.0.4
+================
+* Add support for building an HTML doc out of the README.pgmemcache
+
 pgmemcache 2.0.3
 ===================
 * Add support for all libmemcached 0.38 behaviors (a few had been added since these were updated the last time)

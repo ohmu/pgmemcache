@@ -8,56 +8,48 @@ have a few trivial requirements.
 REQUIREMENTS:
 =============
 
-*) libmemcached(3) 0.38 or newer; Latest is recommended
-   
-   http://tangent.org/552/libmemcached.html
+1) libmemcached 0.38 or newer (http://tangent.org/552/libmemcached.html)**
+2) PostgreSQL 8.4 or newer recommended (http://www.postgresql.org/)**
 
-*) PostgreSQL 8.4 s recommended 
-
-   http://www.postgresql.org/
-
+Always prefer the latest versions.
 
 INSTALLATION:
 =============
 
 1a) Building from sources:
--------------------------
+--------------------------
 
-1) Install PostgreSQL with PGXS (if not already installed).
-2) Install libmemcached.
-3) If necessary, update LD_LIBRARY_CACHE for the PostgreSQL server owner and restart PostgreSQL.
-4) Switch to the PostgreSQL server owner and make sure that the pg_config binary is in your PATH (or edit
-the Makefile).
-In the instructions below, substitute 'gmake' with whatever GNU
-make's name is on your platform (normally gmake, gnumake, or make). 
+1) Install PostgreSQL with PGXS (if not already installed)
+2) Install libmemcached
+3) make
+4) sudo make install
 
-% make
-% sudo make install
+If necessary, update LD_LIBRARY_CACHE for the PostgreSQL server owner and restart PostgreSQL.
+Also make sure that the pg_config binary is in your PATH (or edit the Makefile).
 
 1 b) Building on Debian:
 ------------------------
 
-* sudo apt-get install libmemcached-dev postgresql-server-dev-8.4 libpq-dev devscripts yada flex bison
-* make deb84
-* Install the resulting postgresql-pgmemcache-8.4 .deb package.
+1) sudo apt-get install libmemcached-dev postgresql-server-dev-8.4 libpq-dev devscripts yada flex bison
+2) make deb84
+3) sudo dpkg -i ../postgresql-pgmemcache-8.4*.deb
 
-6) SETUP (run this for all databases you want to use pgmemcache in):
-==================
+SETUP (run this for all databases you want to use pgmemcache in):
+=================================================================
 
-   The path below is the path for FreeBSD, it may be something
-   different on your operating system.  The path is shown above
-   during the `sudo gmake install` step: look in the output above
-   if you're having problems.
+The path below is the path for FreeBSD, it may be something different on your 
+operating system.  The path is shown above during the `sudo make install` 
+step: look in the output above if you're having problems.
+::
 
 	% psql [mydbname] [pguser]
 	[mydbname]=# BEGIN;
 	[mydbname]=# \i /usr/local/postgresql/share/contrib/pgmemcache.sql
 	[mydbname]=# COMMIT;
 
-    It is often more convenient to specify a list of memcached servers
-    to connect to in postgresql.conf, rather than calling
-    memcache_server_add() in each new client connection. This can be
-    done as follows:
+It is often more convenient to specify a list of memcached servers
+to connect to in postgresql.conf, rather than calling memcache_server_add() 
+in each new client connection. This can be done as follows:
 
     1. Edit postgresql.conf
     2. Append "pgmemcache" to shared_preload_libraries
@@ -79,127 +71,142 @@ make's name is on your platform (normally gmake, gnumake, or make).
 
 USAGE:
 ======
-API:
-===
 
-memcache_server_add('hostname:port') */ TEXT,
-memcache_server_add(/* hostname */ TEXT)
-	Adds a server to the list of available servers.  If the port is
-	not specified, the libmemcache default port (11211) is used. This
-	should only be done in one central place in the code (normally
-	wrapped in an IF statement).  See the mc_init() example below for
-	ideas on how this is used.
+**memcache_server_add('hostname:port'::TEXT)**
 
-memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMPTZ)
-memcache_add(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
-memcache_add(/* key */ TEXT, /* value */ TEXT)
-	Adds a key to the cache cluster, if the key does not already
-	exist.
+**memcache_server_add('hostname'::TEXT)**
 
-newval = memcache_decr(/* key */ TEXT, /* decrement */ INT4)
-newval = memcache_decr(/* key */ TEXT)
-	If key exists and is an integer, atomically decrements by the
-	value specified (default decrement is one).  Returns INT value
-	after decrement.
+Adds a server to the list of available servers. If the port is not specified,
+the libmemcache default port (11211) is used. This should only be done in one 
+central place in the code (normally wrapped in an IF statement). 
 
-memcache_delete(/* key */ TEXT, /* hold timer */ INTERVAL)
-memcache_delete(/* key */ TEXT)
-	Deletes a given key. If a hold timer is specified, key with
-	the same name cannot be added until the hold timer expires.
+**memcache_add(key::TEXT, value::TEXT, expire::TIMESTAMPTZ)**
 
-memcache_flush_all()
-	Flushes all data on all servers in the memcache cluster.
+**memcache_add(key::TEXT, value::TEXT, expire::INTERVAL)**
 
-value = memcache_get(TEXT)
-	Fetches a key out of the cache. Returns NULL if the key does not
-	exist; otherwise, it returns the value of the key as TEXT. Note
-	that zero-length values are allowed.
+**memcache_add(key::TEXT, value::TEXT)**
 
-memcache_get_multi (TEXT[])
-        Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
-        for the found keys, with the columns titled key and value.
+Adds a key to the cache cluster, if the key does not already exist.
 
-memcache_get_multi (BYTEA[])
-        Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
-        for the found keys, with the columns titled key and value.
+**newval = memcache_decr(key::TEXT, decrement::INT4)**
 
-newval = memcache_incr(/* key */ TEXT, /* increment */ INT4)
-newval = memcache_incr(/* key */ TEXT)
-	If key exists and is an integer, atomically increment by the
-	value specified (the default increment is one).  Returns INT value
-	after increment.
+**newval = memcache_decr(key::TEXT)**
 
-memcache_replace(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMPTZ)
-memcache_replace(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
-memcache_replace(/* key */ TEXT, /* value */ TEXT)
-	Replaces an existing key's value if the key already exists.
+If key exists and is an integer, atomically decrements by the value specified 
+(default decrement is one).  Returns INT value after decrement.
 
-memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ TIMESTAMPTZ)
-memcache_set(/* key */ TEXT, /* value */ TEXT, /* expire */ INTERVAL)
-memcache_set(/* key */ TEXT, /* value */ TEXT)
-	Regardless of whether the specified key already exists, set its
-	current value to "value", replacing the previous value if any.
+**memcache_delete(key::TEXT, hold_timer::INTERVAL)**
 
-stats = memcache_stats()
-	Returns a TEXT string with all of the stats from all servers
-	in the server list. Statistics are derived from a summation of the
-	statistics of all the servers in the server list.
+**memcache_delete(key::TEXT)**
 
-stat = memcache_stats(/* statistic key */ TEXT)
-	Returns a specific statistic as a TEXT value.
+Deletes a given key. If a hold timer is specified, key with the same name can't
+be added until the hold timer expires.
+
+**memcache_flush_all()**
+
+Flushes all data on all servers in the memcache cluster.
+
+**value = memcache_get(key::TEXT)**
+
+Fetches a key out of the cache. Returns NULL if the key does not exist; otherwise,
+it returns the value of the key as TEXT. Note that zero-length values are allowed.
+
+**memcache_get_multi (keys::TEXT[])**
+
+**memcache_get_multi (keys::BYTEA[])**
+
+Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
+for the found keys, with the columns titled key and value.
+
+**newval = memcache_incr(key::TEXT, increment::INT4)**
+
+**newval = memcache_incr(key::TEXT)**
+
+If key exists and is an integer, atomically increment by the value specified 
+(the default increment is one).  Returns INT value after increment.
+
+**memcache_replace(key::TEXT, value::TEXT, expire::TIMESTAMPTZ)**
+
+**memcache_replace(key::TEXT, value::TEXT, expire::INTERVAL)**
+
+**memcache_replace(key::TEXT, value::TEXT)**
+
+Replaces an existing key's value if the key already exists.
+
+**memcache_set(key::TEXT, value::TEXT, expire::TIMESTAMPTZ)**
+
+**memcache_set(key::TEXT, value::TEXT, expire::INTERVAL)**
+
+**memcache_set(key::TEXT, value::TEXT)**
+
+Regardless of whether the specified key already exists, set its
+current value to "value", replacing the previous value if any.
+
+**stats = memcache_stats()**
+
+Returns a TEXT string with all of the stats from all servers in the server list. 
+Statistics are derived from a summation of the statistics of all the servers in 
+the server list.
+
+**stat = memcache_stats(stats_key::TEXT)**
+
+Returns a specific statistic as a TEXT value.
 
 EXAMPLES:
 =========
 
-Most installations will need a few functions to allow pgmemcache to
-work correctly.  Here are a few example functions that should get most
-people off the ground and running:
+Most installations will need a few functions to allow pgmemcache to work correctly.  
+Here are a few example functions that should get most people off the ground and running:
 
 SET search_path = public;
 
--- The following function is an example of a trigger function that is
--- used to replace the value of something in the cache with its new
--- value.
-CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
-BEGIN
-	IF OLD.passwd != NEW.passwd THEN
-		PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
-	END IF;
-	RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
+The following function is an example of a trigger function that is used to 
+replace the value of something in the cache with its new value.
+::
 
--- Activate the trigger for UPDATEs
+	CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
+		BEGIN
+		IF OLD.passwd != NEW.passwd THEN
+			PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
+		END IF;
+		RETURN NEW;
+	END;
+	$$ LANGUAGE 'plpgsql';
+
+Activate the trigger for UPDATEs.
+
 CREATE TRIGGER auth_passwd_upd_trg AFTER UPDATE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
 
--- The above is not transaction safe, however.  A better approach is
--- to have pgmemcache invalidate the cached data, but not replace it.
-CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER  AS $$
-BEGIN
-	IF OLD.passwd != NEW.passwd THEN
+The above is not transaction safe, however.  A better approach is to have pgmemcache 
+invalidate the cached data, but not replace it.
+::
+
+	CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
+	BEGIN
+		IF OLD.passwd != NEW.passwd THEN
+			PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
+		END IF;
+		RETURN NEW;
+	END;$$ LANGUAGE 'plpgsql';
+
+Here's an example delete trigger::
+
+	CREATE OR REPLACE FUNCTION auth_passwd_del() RETURNS TRIGGER AS $$
+	BEGIN
 		PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
-	END IF;
-	RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
+		RETURN OLD;
+	END;
+	$$ LANGUAGE 'plpgsql';
 
--- Here's an example delete trigger
-CREATE OR REPLACE FUNCTION auth_passwd_del() RETURNS TRIGGER AS $$
-BEGIN
-	PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
-	RETURN OLD;
-END;
-$$ LANGUAGE 'plpgsql';
+Activate the trigger for DELETEs
 
--- Activate the trigger for DELETEs
 CREATE TRIGGER auth_passwd_del_trg AFTER DELETE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_del();
 
 LICENSE:
 ========
 
-pgmemcache is released under an MIT-style license (BSD without
-advertising clause). For the exact license terms, see the file
-"COPYING".
+pgmemcache is released under an MIT-style license (BSD without advertising 
+clause). For the exact license terms, see the file "COPYING".
 
 CONTACT:
 ========
