@@ -8,8 +8,8 @@ have a few trivial requirements.
 REQUIREMENTS:
 =============
 
-1) libmemcached 0.38 or newer (http://tangent.org/552/libmemcached.html)**
-2) PostgreSQL 8.4 or newer recommended (http://www.postgresql.org/)**
+1) libmemcached 0.38 or newer (http://tangent.org/552/libmemcached.html)
+2) PostgreSQL 8.4 or newer recommended (http://www.postgresql.org/)
 
 Always prefer the latest versions.
 
@@ -147,10 +147,6 @@ current value to "value", replacing the previous value if any.
 Returns a TEXT string with all of the stats from all servers in the server list. 
 Statistics are derived from a summation of the statistics of all the servers in 
 the server list.
-
-**stat = memcache_stats(stats_key::TEXT)**
-
-Returns a specific statistic as a TEXT value.
 
 EXAMPLES:
 =========

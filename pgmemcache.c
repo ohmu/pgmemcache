@@ -73,10 +73,10 @@ static memcached_return do_server_add(char *host_str);
 static bool do_memcache_set_cmd(int type, char *key, size_t key_len,
                                 char *val, size_t val_len, time_t expire);
 static time_t interval_to_time_t(Interval *span);
-static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t, void *context);
-static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context);
-static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t, void *context);
-static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t, const size_t, void *context);
+static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const size_t, void *context);
+static void pgmemcache_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context);
+static void *pgmemcache_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t, void *context);
+static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t, void *context);
 
 #define PG_MEMCACHE_ADD                 0x0001
 #define PG_MEMCACHE_REPLACE             0x0002
@@ -101,10 +101,10 @@ _PG_init(void)
   globals.mc = memcached_create(NULL);
 
   if (memcached_set_memory_allocators(globals.mc,
-				      pgmemcached_malloc,
-				      pgmemcached_free,
-				      pgmemcached_realloc,
-				      pgmemcached_calloc,
+				      (memcached_malloc_fn) pgmemcache_malloc,
+				      (memcached_free_fn) pgmemcache_free,
+				      (memcached_realloc_fn) pgmemcache_realloc,
+				      (memcached_calloc_fn) pgmemcache_calloc,
 				      NULL) != MEMCACHED_SUCCESS) {
     elog(ERROR, "pgmemcache: unable to set memory allocators");
   }
@@ -140,23 +140,23 @@ _PG_init(void)
 			      (GucShowHook) show_default_behavior_guc);
 }
 
-static void *pgmemcached_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
+static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
 {
   return MemoryContextAllocZero(globals.pg_ctxt, size);
 }
 
-static void pgmemcached_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context)
+static void pgmemcache_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context)
 {
   pfree(mem);
 }
 
-static void *pgmemcached_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size, void *context)
+static void *pgmemcache_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size, void *context)
 {
   /* postgresql repalloc() fails if 'mem' is NULL */
   return mem ? repalloc(mem, (Size)size) : MemoryContextAllocZero(globals.pg_ctxt, size);
 }
 
-static void *pgmemcached_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size, void *context)
+static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size, void *context)
 {
   return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
 }
@@ -857,76 +857,49 @@ get_memcached_distribution_type (const char *data)
   return ret;
 }
 
+static memcached_return_t server_stat_function(const memcached_st *ptr __attribute__((unused)),
+					       const memcached_server_st *server,
+					       void *context)
+{
+  char **list, **stat_ptr;
+  memcached_return rc;
+  memcached_stat_st stat;
+
+  rc = memcached_stat_servername(&stat, NULL,
+				 memcached_server_name(server),
+				 memcached_server_port(server));
+
+  list = memcached_stat_get_keys(ptr, &stat, &rc);
+
+  appendStringInfo(context, "Server: %s (%u)\n", memcached_server_name(server),
+		   memcached_server_port(server));
+  for (stat_ptr = list; *stat_ptr; stat_ptr++)
+    {
+      char *value = memcached_stat_get_value(ptr, &stat, *stat_ptr, &rc);
+      appendStringInfo(context, "%s: %s\n", *stat_ptr, value);
+      pfree(value);
+    }
+
+  pfree(list);
+  return MEMCACHED_SUCCESS;
+}
+
 Datum
 memcache_stats(PG_FUNCTION_ARGS)
 {
   StringInfoData buf;
-  unsigned int i;
-  memcached_server_st *server_list;
   memcached_return rc;
-  memcached_stat_st *stat;
+  memcached_server_fn callbacks[1];
 
   initStringInfo(&buf);
 
-  server_list = memcached_server_list(globals.mc);
-  stat = memcached_stat(globals.mc, NULL, &rc);
-	
+  callbacks[0]= server_stat_function;
+  appendStringInfo(&buf, "\n");
+  rc = memcached_server_cursor(globals.mc, callbacks, (void *)&buf, 1);
+  
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_SOME_ERRORS)
     elog(ERROR, "Failed to communicate with servers %s\n", memcached_strerror(globals.mc, rc));
-	
-  for (i = 0; i < memcached_server_count(globals.mc); i++)
-    {
-      char **list, **ptr;
-		
-      list = memcached_stat_get_keys(globals.mc, &stat[i], &rc);
-      if (i != 0)
-	appendStringInfo(&buf, "\n");
 
-      appendStringInfo(&buf, "Server: %s (%u)\n", memcached_server_name(globals.mc, server_list[i]),
-		       memcached_server_port(globals.mc, server_list[i]));
-      for (ptr = list; *ptr; ptr++)
-	{
-	  memcached_return rc;
-	  char *value = memcached_stat_get_value(globals.mc, &stat[i], *ptr, &rc);
-	  appendStringInfo(&buf, "%s: %s\n", *ptr, value);
-	  pfree(value);
-	}
-      pfree(list);
-    }
-	
   PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
 }
 
-Datum
-memcache_stat(PG_FUNCTION_ARGS)
-{
-  text *stat = PG_GETARG_TEXT_P(0);
-  memcached_stat_st *stats;
-  char *key, *return_value = NULL;
-  size_t key_length;
-  StringInfoData buf;
-  unsigned int i;
-  memcached_return rc;
-	
-  initStringInfo(&buf);
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(stat)));
-  key_length = strlen(key);
-  if (key_length == 0)
-    elog(ERROR, "memcache statistic key cannot be the empty string");
-	
-  stats = memcached_stat(globals.mc, NULL, &rc);
-  if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_SOME_ERRORS)
-    elog(ERROR, "Failed to communicate with servers %s\n", memcached_strerror(globals.mc, rc));
-	
-  for (i = 0; i < memcached_server_count(globals.mc); i++)
-    return_value = memcached_stat_get_value(globals.mc, &stats[i], key, &rc);
-
-  if (rc != MEMCACHED_SUCCESS)
-    elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
-	
-  if (return_value)
-    appendStringInfo(&buf, "%s: %s", key, return_value);
-  pfree(return_value);
-
-  PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
-}

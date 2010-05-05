@@ -27,7 +27,6 @@ AS 'MODULE_PATHNAME', 'memcache_add_absexpire' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_add(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_add' LANGUAGE 'C';
 
-
 CREATE OR REPLACE FUNCTION memcache_get(TEXT) RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_get' LANGUAGE 'C';
 
@@ -124,7 +123,6 @@ AS 'MODULE_PATHNAME', 'memcache_append_absexpire' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_append(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_append' LANGUAGE 'C';
 
-
 -- $1 = key - TEXT
 -- $2 = val - TEXT
 -- $3 = expire - INTERVAL or TIMESTAMPTZ (opt)
@@ -149,10 +147,5 @@ AS 'MODULE_PATHNAME', 'memcache_append_absexpire' LANGUAGE 'C';
 CREATE OR REPLACE FUNCTION memcache_append(TEXT, TEXT) RETURNS BOOL
 AS 'MODULE_PATHNAME', 'memcache_append' LANGUAGE 'C';
 
-
 CREATE OR REPLACE FUNCTION memcache_stats() RETURNS TEXT
 AS 'MODULE_PATHNAME', 'memcache_stats' LANGUAGE 'C';
-
--- $1 = stat name - TEXT
-CREATE OR REPLACE FUNCTION memcache_stats(TEXT) RETURNS TEXT
-AS 'MODULE_PATHNAME', 'memcache_stat' LANGUAGE 'C' STRICT;

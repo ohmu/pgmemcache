@@ -1,6 +1,8 @@
 pgmemcache 2.0.4
 ================
 * Add support for building an HTML doc out of the README.pgmemcache
+* Make pgmemcache work with libmemcached's 0.39 and 0.40 which again break API compatibility
+   * Remove memcache_stats(TEXT) (Note, memcache_stats() is still supported) 
 
 pgmemcache 2.0.3
 ===================
