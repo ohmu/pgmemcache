@@ -1,0 +1,15 @@
+#$PostgreSQL$
+module pgmemcache 1.0;
+
+require {
+       type postgresql_port_t;
+       type postgresql_t;
+       type http_cache_port_t;
+       class tcp_socket name_connect;
+       class unix_stream_socket connectto;
+}
+
+#============= postgresql_t ==============
+allow postgresql_t http_cache_port_t:tcp_socket name_connect;
+allow postgresql_t http_cache_port_t:unix_stream_socket connectto;
+

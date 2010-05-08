@@ -68,6 +68,11 @@ in each new client connection. This can be done as follows:
        
        in your postgresql.conf
 
+In case your system has SELinux please run:
+
+/usr/bin/checkmodule -M -m -o pgmemcache.mod pgmemcache.te
+/usr/bin/semodule_package -o pgmemcache.pp -m pgmemcache.mod
+/usr/sbin/semodule -i pgmemcache.pp
 
 USAGE:
 ======
