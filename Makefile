@@ -4,7 +4,7 @@ PGMC_VERSION = 2.0.4
 
 OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
-SHLIB_LINK = -lmemcached
+SHLIB_LINK = -lmemcached -lsasl2
 
 PGXS := $(shell pg_config --pgxs)
 include $(PGXS)
