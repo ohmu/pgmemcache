@@ -19,7 +19,7 @@ deb84:
 	yada rebuild
 	debuild -uc -us -b
 deb90:
-        sed -e s/PGVER/9.0/g < debian/packages.in > debian/packages
-        yada rebuild
-        debuild -uc -us -b
+	sed -e s/PGVER/9.0/g < debian/packages.in > debian/packages
+	yada rebuild
+	debuild -uc -us -b
 
