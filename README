@@ -234,5 +234,3 @@ THANKS:
 
 Suzuki Hironobu contributed major patches for the 2.0 series, among other
 things, support for libmemcached configuration settings.
-
-$PostgreSQL$

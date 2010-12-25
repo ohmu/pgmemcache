@@ -1,5 +1,4 @@
 ## debian/packages for pgmemcache 2.x
-# $PostgreSQL$
 Source: pgmemcache
 Section: contrib/misc
 Priority: extra

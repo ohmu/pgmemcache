@@ -1,3 +1,9 @@
+pgmemcache 2.0.5
+================
+* SASL support
+* Support for building debs againt PG 9.0
+* Move to GIT.
+
 pgmemcache 2.0.4
 ================
 * Add support for building an HTML doc out of the README.pgmemcache
@@ -169,5 +175,3 @@ pgmemcache 1.1 beta1
   rather than a heap-allocated StringInfo.
 
 * Fix typo in the implementation of memcache_stat(TEXT).
-
-$PostgreSQL$

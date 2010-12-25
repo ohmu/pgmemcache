@@ -6,8 +6,6 @@
  * Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
  * Copyright (c) 2008-2010 Hannu Valtonen <hannu.valtonen@hut.fi>
  *
- * $PostgreSQL$
- *
  * See the file COPYING for distribution terms.
  */
 #ifndef PGMEMCACHE_H

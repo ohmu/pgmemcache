@@ -1,4 +1,3 @@
-#$PostgreSQL$
 module pgmemcache 1.0;
 
 require {
