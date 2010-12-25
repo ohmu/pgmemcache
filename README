@@ -42,10 +42,7 @@ operating system.  The path is shown above during the `sudo make install`
 step: look in the output above if you're having problems.
 ::
 
-	% psql [mydbname] [pguser]
-	[mydbname]=# BEGIN;
-	[mydbname]=# \i /usr/local/postgresql/share/contrib/pgmemcache.sql
-	[mydbname]=# COMMIT;
+	% psql -f /usr/local/postgresql/share/contrib/pgmemcache.sql <mydbname>
 
 It is often more convenient to specify a list of memcached servers
 to connect to in postgresql.conf, rather than calling memcache_server_add() 
