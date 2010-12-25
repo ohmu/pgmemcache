@@ -30,9 +30,9 @@ Also make sure that the pg_config binary is in your PATH (or edit the Makefile).
 1 b) Building on Debian:
 ------------------------
 
-1) sudo apt-get install libmemcached-dev postgresql-server-dev-8.4 libpq-dev devscripts yada flex bison
+1) sudo make build-dep
 2) make deb84
-3) sudo dpkg -i ../postgresql-pgmemcache-8.4*.deb
+3) sudo dpkg -i ../postgresql-pgmemcache-*.deb
 
 SETUP (run this for all databases you want to use pgmemcache in):
 =================================================================

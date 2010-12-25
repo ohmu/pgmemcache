@@ -23,3 +23,6 @@ deb90:
 	yada rebuild
 	debuild -uc -us -b
 
+build-dep:
+	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison
+
