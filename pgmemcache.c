@@ -147,7 +147,7 @@ static GucStringAssignHook assign_default_behavior_guc (const char *newval, bool
 
 static GucShowHook show_default_behavior_guc (void)
 {
-  return (GucShowHook) memcache_default_behavior ? (GucShowHook) memcache_default_servers: (GucShowHook) "";
+  return (GucShowHook) memcache_default_behavior ? (GucShowHook) memcache_default_behavior: (GucShowHook) "";
 }
 
 static GucShowHook show_memcache_sasl_authentication_username_guc(void)
