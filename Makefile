@@ -11,7 +11,7 @@ include $(PGXS)
 # Build a release tarball. To make a release, update PGMC_VERSION, adjust 
 # the version number in the README, and add an entry to NEWS.
 html:
-	rst2html.py README.pgmemcache README.pgmemcache.html
+	rst2html.py README README.html
 dist:
 	tar -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
 deb84:
