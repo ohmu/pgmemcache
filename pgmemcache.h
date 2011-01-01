@@ -4,7 +4,7 @@
  * Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
  * Copyright (c) 2007 Neil Conway <neilc@samurai.com>
  * Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
- * Copyright (c) 2008-2010 Hannu Valtonen <hannu.valtonen@hut.fi>
+ * Copyright (c) 2008-2011 Hannu Valtonen <hannu.valtonen@hut.fi>
  *
  * See the file COPYING for distribution terms.
  */
