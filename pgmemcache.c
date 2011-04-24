@@ -485,8 +485,8 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
     values[0] = (char *) palloc(fctx->key_lens[funcctx->call_cntr] * sizeof(char));
     values[1] = (char *) palloc(value_length * sizeof(char));
 
-    snprintf(values[0], fctx->key_lens[funcctx->call_cntr] + 1, "%s", fctx->keys[funcctx->call_cntr]);
-    snprintf(values[1], value_length + 1, "%s", value);
+    memcpy(values[0], fctx->keys[funcctx->call_cntr], fctx->key_lens[funcctx->call_cntr]);
+    memcpy(values[1], value, value_length);
 
     tuple = BuildTupleFromCStrings(attinmeta, values);
     result = HeapTupleGetDatum(tuple);
