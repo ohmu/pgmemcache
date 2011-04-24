@@ -4,6 +4,7 @@ pgmemcache 2.0.5
 * Make pgmemcache work with PG 9.1
 * Support for building debs against PG 9.0 and 9.1
 * Move to GIT.
+* Fix erroneous memory allocation get_multi (thanks iglue)
 
 pgmemcache 2.0.4
 ================
