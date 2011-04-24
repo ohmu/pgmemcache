@@ -37,15 +37,15 @@ Also make sure that the pg_config binary is in your PATH (or edit the Makefile).
 SETUP (run this for all databases you want to use pgmemcache in):
 =================================================================
 
-The path below is the path for FreeBSD, it may be something different on your 
-operating system.  The path is shown above during the `sudo make install` 
+The path below is the path for FreeBSD, it may be something different on your
+operating system.  The path is shown above during the `sudo make install`
 step: look in the output above if you're having problems.
 ::
 
 	% psql -f /usr/local/postgresql/share/contrib/pgmemcache.sql <mydbname>
 
 It is often more convenient to specify a list of memcached servers
-to connect to in postgresql.conf, rather than calling memcache_server_add() 
+to connect to in postgresql.conf, rather than calling memcache_server_add()
 in each new client connection. This can be done as follows:
 
     1. Edit postgresql.conf
@@ -56,13 +56,13 @@ in each new client connection. This can be done as follows:
 
     4. Set the "pgmemcache.default_servers" custom GUC variable to a
        comma-separated list of 'host:port' pairs (the port is optional).
-    5. Set the pgmemcache.default_behavior flags to suit your needs. The format is a 
+    5. Set the pgmemcache.default_behavior flags to suit your needs. The format is a
        comma-separated list of memcached behavior (optional) of behavior_flag:behavior_data.
-       The flags correspond with libmemcached behavior flags. Check the libmemcached 
+       The flags correspond with libmemcached behavior flags. Check the libmemcached
        documentation for those. As an example behavior you might have a line like:
-        
+
        pgmemcache.default_behavior='BINARY_PROTOCOL:1'
-       
+
        in your postgresql.conf
 
 In case your system has SELinux please run:
@@ -79,8 +79,8 @@ USAGE:
 **memcache_server_add('hostname'::TEXT)**
 
 Adds a server to the list of available servers. If the port is not specified,
-the libmemcache default port (11211) is used. This should only be done in one 
-central place in the code (normally wrapped in an IF statement). 
+the libmemcache default port (11211) is used. This should only be done in one
+central place in the code (normally wrapped in an IF statement).
 
 **memcache_add(key::TEXT, value::TEXT, expire::TIMESTAMPTZ)**
 
@@ -94,7 +94,7 @@ Adds a key to the cache cluster, if the key does not already exist.
 
 **newval = memcache_decr(key::TEXT)**
 
-If key exists and is an integer, atomically decrements by the value specified 
+If key exists and is an integer, atomically decrements by the value specified
 (default decrement is one).  Returns INT value after decrement.
 
 **memcache_delete(key::TEXT, hold_timer::INTERVAL)**
@@ -117,14 +117,14 @@ it returns the value of the key as TEXT. Note that zero-length values are allowe
 
 **memcache_get_multi (keys::BYTEA[])**
 
-Fetches an ARRAY of keys from the cache, returns a list of RECORDs 
+Fetches an ARRAY of keys from the cache, returns a list of RECORDs
 for the found keys, with the columns titled key and value.
 
 **newval = memcache_incr(key::TEXT, increment::INT4)**
 
 **newval = memcache_incr(key::TEXT)**
 
-If key exists and is an integer, atomically increment by the value specified 
+If key exists and is an integer, atomically increment by the value specified
 (the default increment is one).  Returns INT value after increment.
 
 **memcache_replace(key::TEXT, value::TEXT, expire::TIMESTAMPTZ)**
@@ -146,19 +146,19 @@ current value to "value", replacing the previous value if any.
 
 **stats = memcache_stats()**
 
-Returns a TEXT string with all of the stats from all servers in the server list. 
-Statistics are derived from a summation of the statistics of all the servers in 
+Returns a TEXT string with all of the stats from all servers in the server list.
+Statistics are derived from a summation of the statistics of all the servers in
 the server list.
 
 EXAMPLES:
 =========
 
-Most installations will need a few functions to allow pgmemcache to work correctly.  
+Most installations will need a few functions to allow pgmemcache to work correctly.
 Here are a few example functions that should get most people off the ground and running:
 
 SET search_path = public;
 
-The following function is an example of a trigger function that is used to 
+The following function is an example of a trigger function that is used to
 replace the value of something in the cache with its new value.
 ::
 
@@ -175,7 +175,7 @@ Activate the trigger for UPDATEs.
 
 CREATE TRIGGER auth_passwd_upd_trg AFTER UPDATE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
 
-The above is not transaction safe, however.  A better approach is to have pgmemcache 
+The above is not transaction safe, however.  A better approach is to have pgmemcache
 invalidate the cached data, but not replace it.
 ::
 
@@ -203,7 +203,7 @@ CREATE TRIGGER auth_passwd_del_trg AFTER DELETE ON passwd FOR EACH ROW EXECUTE P
 LICENSE:
 ========
 
-pgmemcache is released under an MIT-style license (BSD without advertising 
+pgmemcache is released under an MIT-style license (BSD without advertising
 clause). For the exact license terms, see the file "COPYING".
 
 CONTACT:
@@ -211,19 +211,19 @@ CONTACT:
 
 Bug reports and patches are very welcome, either submitted via the
 PgFoundry web interface (http://pgfoundry.org/projects/pgmemcache),
-or sent via email to <hannu.valtonen@hut.fi>.
+or sent via email to <hannu.valtonen@ormod.com>.
 
 HISTORY:
 ========
 
 pgmemcache was originally written by Sean Chittenden. During version
 1.1 times it was maintained by Neil Conway. Since version 2.0 pgmemcache
-was rewritten to work on top of libmemcached and the maintainership 
+was rewritten to work on top of libmemcached and the maintainership
 moved to Hannu Valtonen.
 
-During version 1.x series starting from 1.1, development of pgmemcache 
-was sponsored by the Open Technology Group, Inc. (OTG). 
-OTG provides training in a wide range of open source software, including 
+During version 1.x series starting from 1.1, development of pgmemcache
+was sponsored by the Open Technology Group, Inc. (OTG).
+OTG provides training in a wide range of open source software, including
 pgmemcache and PostgreSQL training. For more information, see http://www.otg-nc.com/
 
 THANKS:
