@@ -13,7 +13,7 @@ include $(PGXS)
 html:
 	rst2html.py README README.html
 dist:
-	tar -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
+	tar --exclude .git -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
 deb84:
 	sed -e s/PGVER/8.4/g < debian/packages.in > debian/packages
 	yada rebuild
