@@ -1,14 +1,15 @@
 pgmemcache 2.0.5
 ================
-* SASL support
-* Support for building debs againt PG 9.0
+* Some preliminary work on SASL support
+* Make pgmemcache work with PG 9.1
+* Support for building debs against PG 9.0 and 9.1
 * Move to GIT.
 
 pgmemcache 2.0.4
 ================
 * Add support for building an HTML doc out of the README.pgmemcache
 * Make pgmemcache work with libmemcached's 0.39 and 0.40 which again break API compatibility
-   * Remove memcache_stats(TEXT) (Note, memcache_stats() is still supported) 
+   * Remove memcache_stats(TEXT) (Note, memcache_stats() is still supported)
 
 pgmemcache 2.0.3
 ===================
@@ -23,14 +24,14 @@ This bumps up pgmemcache's libmemcached requirement up to 0.38.
 pgmemcache 2.0.1
 ===================
 * Remove some deprecated documentation
-* Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks to Marc Munro for 
+* Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks to Marc Munro for
 pointing out the problem and a fix for it.
 * Make libmemcached use PostgreSQL memory allocation routines. (requires libmemcached 0.31+), based on a patch from
 Peter Meszaros with some editorialization by Hannu Valtonen. Note this bumps up our libmemcached minimum requirement to 0.31.
 
 pgmemcache 2.0.0
 ===================
-Finally a 2.0.0 release. 
+Finally a 2.0.0 release.
 
 * Fix default (unset) GUC crashes, based on a patch from Claes Jakobsson
 * Add BYTEA memcache_get
@@ -56,7 +57,7 @@ pgmemcache 2.0 beta1
 
 pgmemcache was completely rewritten to work on top of libmemcached. It requires PostgreSQL 8.4+ and
 is not backwards compatible with older versions of PostgreSQL. That may or may not change depending
-on how much are people interested in having it work on older versions. 
+on how much are people interested in having it work on older versions.
 
 Also some API's were deprecated:
 * memcache_server_find_hash
@@ -65,7 +66,7 @@ Also some API's were deprecated:
 * memcache_server_remove
 * memcache_hash
 
-Also starting from 2.0 beta 1 the maintainership has moved to Hannu Valtonen. 
+Also starting from 2.0 beta 1 the maintainership has moved to Hannu Valtonen.
 
 pgmemcache 1.2 beta1
 ====================

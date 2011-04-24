@@ -8,7 +8,7 @@ SHLIB_LINK = -lmemcached -lsasl2
 PGXS := $(shell pg_config --pgxs)
 include $(PGXS)
 
-# Build a release tarball. To make a release, update PGMC_VERSION, adjust 
+# Build a release tarball. To make a release, update PGMC_VERSION, adjust
 # the version number in the README, and add an entry to NEWS.
 html:
 	rst2html.py README README.html
@@ -22,7 +22,10 @@ deb90:
 	sed -e s/PGVER/9.0/g < debian/packages.in > debian/packages
 	yada rebuild
 	debuild -uc -us -b
-
+deb91:
+	sed -e s/PGVER/9.1/g < debian/packages.in > debian/packages
+	yada rebuild
+	debuild -uc -us -b
 build-dep:
 	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison
 

@@ -5,7 +5,7 @@
  * Copyright (c) 2007-2008 Neil Conway <neilc@samurai.com>
  * Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
  * Copyright (c) 2008-2011 Hannu Valtonen <hannu.valtonen@hut.fi>
- * 
+ *
  * See the file COPYING for distribution terms.
  */
 #include "pgmemcache.h"
@@ -28,11 +28,11 @@ static char *memcache_default_behavior = "";
 static char *memcache_sasl_authentication_username = "";
 static char *memcache_sasl_authentication_password = "";
 
-static sasl_callback_t sasl_callbacks[] = 
+static sasl_callback_t sasl_callbacks[] =
 {
-  { SASL_CB_USER, &get_sasl_username, NULL}, 
-  { SASL_CB_AUTHNAME, &get_sasl_username, NULL}, 
-  { SASL_CB_PASS, &get_sasl_password, NULL}, 
+  { SASL_CB_USER, &get_sasl_username, NULL},
+  { SASL_CB_AUTHNAME, &get_sasl_username, NULL},
+  { SASL_CB_PASS, &get_sasl_password, NULL},
   { SASL_CB_LIST_END, NULL, NULL}
 };
 
@@ -57,7 +57,7 @@ void _PG_init(void)
 				      NULL) != MEMCACHED_SUCCESS) {
     elog(ERROR, "pgmemcache: unable to set memory allocators");
   }
-	
+
   MemoryContextSwitchTo(old_ctxt);
 
   DefineCustomStringVariable("pgmemcache.default_servers",
@@ -67,9 +67,12 @@ void _PG_init(void)
 			     NULL,
 			     PGC_USERSET,
 			     GUC_LIST_INPUT,
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
+			     (GucStringCheckHook) check_default_guc,
+#endif
 			     (GucStringAssignHook) assign_default_servers_guc,
 			     (GucShowHook) show_default_servers_guc);
-    
+
   DefineCustomStringVariable ("pgmemcache.default_behavior",
 			      "Comma-separated list of memcached behavior (optional).",
 			      "Specified as a comma-separated list of behavior_flag:behavior_data.",
@@ -77,6 +80,9 @@ void _PG_init(void)
 			      NULL,
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
+			      (GucStringCheckHook) check_default_guc,
+#endif
 			      (GucStringAssignHook) assign_default_behavior_guc,
 			      (GucShowHook) show_default_behavior_guc);
 
@@ -87,6 +93,9 @@ void _PG_init(void)
 			      NULL,
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
+			      (GucStringCheckHook) check_default_guc,
+#endif
 			      NULL,
 			      (GucShowHook) show_memcache_sasl_authentication_username_guc);
 
@@ -97,6 +106,9 @@ void _PG_init(void)
 			      NULL,
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
+			      (GucStringCheckHook) check_default_guc,
+#endif
 			      NULL,
 			      (GucShowHook) show_memcache_sasl_authentication_password_guc);
 #if 0
@@ -129,9 +141,15 @@ static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t
   return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
 }
 
+static GucStringCheckHook check_default_guc(const char *newval, void **extra, GucSource source)
+{
+  return (GucStringCheckHook) newval;
+}
+
 static GucStringAssignHook assign_default_servers_guc(const char *newval, bool doit, GucSource source)
 {
-  do_server_add((char *) newval);
+  if (newval)
+    do_server_add((char *) newval);
   return (GucStringAssignHook) newval;
 }
 
@@ -167,6 +185,8 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
   StringInfoData data_buf;
   memcached_return rc;
   MemoryContext old_ctx;
+  if (!newval)
+    return (GucStringAssignHook) newval;
   old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
 
   initStringInfo (&flag_buf);
@@ -174,11 +194,11 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
 
   len = strlen (newval);
 
-  for (i = 0; i < len; i++) 
+  for (i = 0; i < len; i++)
     {
       char c = newval[i];
 
-      if (c == ',' || c == ':') 
+      if (c == ',' || c == ':')
         {
 	  if (flag_buf.len == 0)
 	    return NULL;
@@ -210,7 +230,7 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
 	  data_buf.data[0] = '\0';
 	  data_buf.len = 0;
         }
-      else 
+      else
         {
 	  appendStringInfoChar (&flag_buf, c);
         }
@@ -251,10 +271,10 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
   uint64_t val;
   unsigned int offset = 1;
   memcached_return rc;
-	
+
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
   key_length = strlen(key);
-	
+
   if (key_length < 1)
     elog(ERROR, "memcache key cannot be an empty string");
   if (key_length >= 250)
@@ -270,7 +290,7 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
 
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
-	
+
   PG_RETURN_UINT32(val);
 }
 
@@ -297,9 +317,9 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
   hold = (time_t) 0.0;
   if (PG_NARGS() >= 2 && PG_ARGISNULL(1) == false)
     hold = interval_to_time_t(PG_GETARG_INTERVAL_P(1));
-	
+
   rc = memcached_delete(globals.mc, key, key_length, hold);
-	
+
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
     elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
 
@@ -331,7 +351,7 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
   memcached_return rc;
 
   rc = memcached_flush(globals.mc, opt_expire);
-  if (rc != MEMCACHED_SUCCESS) 
+  if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "%s", memcached_strerror(globals.mc, rc));
 
   PG_RETURN_BOOL(rc == 0);
@@ -349,7 +369,7 @@ Datum memcache_get(PG_FUNCTION_ARGS)
     elog(ERROR, "memcache key cannot be NULL");
 
   get_key = PG_GETARG_TEXT_P(0);
-	
+
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
   key_length = strlen(key);
 
@@ -357,12 +377,12 @@ Datum memcache_get(PG_FUNCTION_ARGS)
     elog(ERROR, "memcache key cannot be an empty string");
   if (key_length >= 250)
     elog(ERROR, "memcache key too long");
-    
+
   string = memcached_get(globals.mc, key, key_length, &return_value_length, &flags, &rc);
-    
+
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
     elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
-    
+
   if (rc == MEMCACHED_NOTFOUND)
     PG_RETURN_NULL();
 
@@ -382,7 +402,7 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   memcached_return rc;
   char typalign;
   int16 typlen;
-  bool typbyval;    
+  bool typbyval;
   char **keys, *value;
   size_t *key_lens, value_length;
   FuncCallContext *funcctx;
@@ -393,11 +413,11 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
   if (PG_ARGISNULL(0))
     elog(ERROR, "memcache get_multi key cannot be null");
-    
+
   array = PG_GETARG_ARRAYTYPE_P(0);
   if (ARR_NDIM(array) != 1)
     elog(ERROR, "pgmemcache only supports single dimension ARRAYs, not: ARRAYs with %d dimensions", ARR_NDIM(array));
-    
+
   array_lbound = ARR_LBOUND(array)[0];
   array_length = ARR_DIMS(array)[0];
   element_type = ARR_ELEMTYPE(array);
@@ -415,15 +435,15 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       fctx = (internal_fctx *) palloc(sizeof(internal_fctx));
 
       get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
-    
+
       keys = palloc(sizeof(char *) * array_length);
       key_lens = palloc(sizeof(size_t) * array_length);
-	       
+
       for (i = 0;i < array_length;i++) {
 	int offset = array_lbound + i;
 	bool isnull;
 	Datum elem;
-		  
+
 	elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
 	if(!isnull) {
 	  keys[i] = TextDatumGetCString(PointerGetDatum(elem));
@@ -436,16 +456,16 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       rc = memcached_mget(globals.mc, (const char **)keys, key_lens, array_length);
       if (rc != MEMCACHED_SUCCESS)
 	elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
-		
+
       if (rc == MEMCACHED_NOTFOUND)
 	PG_RETURN_NULL();
-		
+
       attinmeta = TupleDescGetAttInMetadata(tupdesc);
       funcctx->attinmeta = attinmeta;
       funcctx->user_fctx = fctx;
       MemoryContextSwitchTo(oldcontext);
     }
-    
+
   funcctx = SRF_PERCALL_SETUP();
   fctx = funcctx->user_fctx;
   attinmeta = funcctx->attinmeta;
@@ -455,7 +475,7 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
     HeapTuple    tuple;
     Datum        result;
 
-    if (value == NULL && rc == MEMCACHED_END) 
+    if (value == NULL && rc == MEMCACHED_END)
       SRF_RETURN_DONE(funcctx);
     else if (rc != MEMCACHED_SUCCESS) {
       elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
@@ -542,7 +562,7 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
   /* These aren't really needed as we set libmemcached behavior to check for all invalid sets */
   if (key_length < 1)
     elog(ERROR, "memcache key cannot be an empty string");
-  if (key_length >= 250) 
+  if (key_length >= 250)
     elog(ERROR, "memcache key too long");
 
   val = PG_GETARG_TEXT_P(1);
@@ -585,7 +605,7 @@ static bool do_memcache_set_cmd(int type, char *key, size_t key_length,
 				char *value, size_t value_length, time_t expiration)
 {
   memcached_return rc = 1; /*FIXME GCC Warning hack*/
-	
+
   if (type & PG_MEMCACHE_ADD)
     rc = memcached_add (globals.mc, key, key_length, value, value_length, expiration, 0);
   else if (type & PG_MEMCACHE_REPLACE)
@@ -613,13 +633,13 @@ Datum memcache_server_add(PG_FUNCTION_ARGS)
   text *server = PG_GETARG_TEXT_P(0);
   char * host_str;
   memcached_return rc;
-	
+
   host_str = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(server)));
 
   rc = do_server_add(host_str);
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "%s", memcached_strerror(globals.mc, rc));
-    
+
   PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
@@ -628,15 +648,15 @@ static memcached_return do_server_add(char *host_str)
   memcached_server_st *servers;
   memcached_return rc;
   MemoryContext old_ctx;
-	
+
   old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
-	
+
   servers = memcached_servers_parse(host_str);
   rc = memcached_server_push(globals.mc, servers);
   memcached_server_list_free(servers);
-    
+
   MemoryContextSwitchTo(old_ctx);
-    
+
   return rc;
 }
 
@@ -719,7 +739,7 @@ static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
   memcached_behavior f_code = get_memcached_behavior_flag (flag);
   uint64_t ret;
 
-  switch (f_code) 
+  switch (f_code)
     {
     case MEMCACHED_BEHAVIOR_HASH:
     case MEMCACHED_BEHAVIOR_KETAMA_HASH:
@@ -733,7 +753,7 @@ static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
       if (endptr == data)
 	elog (ERROR, "invalid memcached behavior param %s: %s", flag, data);
     }
-    
+
   return ret;
 }
 
@@ -762,12 +782,12 @@ static uint64_t get_memcached_hash_type (const char *data)
     ret = MEMCACHED_HASH_DEFAULT;
   else if (strncmp ("MEMCACHED_HASH_CRC", data, 18) == 0 || strncmp ("CRC", data, 3) == 0)
     ret = MEMCACHED_HASH_CRC;
-  else 
+  else
     {
       ret = 0xffffffff; /* to avoid warning */
       elog (ERROR, "invalid hash name: %s", data);
     }
-    
+
   return ret;
 }
 
@@ -784,7 +804,7 @@ static uint64_t get_memcached_distribution_type (const char *data)
     ret = MEMCACHED_DISTRIBUTION_CONSISTENT_KETAMA;
   else if (strncmp ("MEMCACHED_DISTRIBUTION_CONSISTENT", data, 33) == 0 || strncmp ("CONSISTENT", data, 10) == 0)
     ret = MEMCACHED_DISTRIBUTION_CONSISTENT;
-  else 
+  else
     {
       ret = 0xffffffff; /* to avoid warning */
       elog (ERROR, "invalid distribution name: %s", data);
@@ -829,7 +849,7 @@ Datum memcache_stats(PG_FUNCTION_ARGS)
   callbacks[0]= server_stat_function;
   appendStringInfo(&buf, "\n");
   rc = memcached_server_cursor(globals.mc, callbacks, (void *)&buf, 1);
-  
+
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_SOME_ERRORS)
     elog(WARNING, "Failed to communicate with servers %s\n", memcached_strerror(globals.mc, rc));
 
@@ -838,15 +858,15 @@ Datum memcache_stats(PG_FUNCTION_ARGS)
 
 static int get_sasl_username(void *context, int id, const char **result, unsigned int *len)
 {
-  if (!result || (id != SASL_CB_USER && id != SASL_CB_AUTHNAME)) 
+  if (!result || (id != SASL_CB_USER && id != SASL_CB_AUTHNAME))
     return SASL_BADPARAM;
   *result= memcache_sasl_authentication_username;
   if (len)
     *len= (memcache_sasl_authentication_username == NULL) ? 0 : (unsigned int) strlen(memcache_sasl_authentication_username);
- 
+
   return SASL_OK;
 }
- 
+
 static int get_sasl_password(sasl_conn_t *conn, void *context, int id, sasl_secret_t **psecret)
 {
   static sasl_secret_t* x;
@@ -866,7 +886,7 @@ static int get_sasl_password(sasl_conn_t *conn, void *context, int id, sasl_secr
     return SASL_NOMEM;
 
   x->len = len;
-  strcpy((void *)x->data, memcache_sasl_authentication_password); 
+  strcpy((void *)x->data, memcache_sasl_authentication_password);
   *psecret = x;
   return SASL_OK;
 }
