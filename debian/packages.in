@@ -11,7 +11,7 @@ Build: sh
  make
 Clean: sh
  make clean || true
-Build-Depends: postgresql-server-dev-PGVER, flex | flex-old, bison, yada, libmemcached-dev, libpq-dev, devscripts
+Build-Depends: postgresql-server-dev-PGVER, flex | flex-old, bison, yada, libmemcached-dev, libpq-dev, devscripts, libsasl2-dev
 
 
 Package: postgresql-pgmemcache-PGVER

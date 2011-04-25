@@ -1,3 +1,9 @@
+pgmemcache (2.0.6) unstable; urgency=low
+
+  * v2.0.6
+
+ -- Hannu Valtonen <hannu.valtonen@ormod.com>  Wed, 25 Apr 2011 23:09:00 +0200
+
 pgmemcache (2.0.5) unstable; urgency=low
 
   * v2.0.5

@@ -1,3 +1,8 @@
+pgmemcache 2.0.6
+================
+* Fix building on earlier releases than 9.1. (thanks for the bugreport from Florian Von Block)
+* Add libsasl2-dev to build deps
+
 pgmemcache 2.0.5
 ================
 * Some preliminary work on SASL support
