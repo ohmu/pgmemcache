@@ -50,7 +50,9 @@ static GucShowHook show_default_servers_guc (void);
 static GucShowHook show_default_behavior_guc (void);
 static GucShowHook show_memcache_sasl_authentication_username_guc (void);
 static GucShowHook show_memcache_sasl_authentication_password_guc (void);
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
 static GucStringCheckHook check_default_guc(const char *newval, void **extra, GucSource source);
+#endif
 static memcached_behavior get_memcached_behavior_flag (const char *flag);
 static uint64_t get_memcached_behavior_data (const char *flag, const char *data);
 static uint64_t get_memcached_hash_type (const char *data);

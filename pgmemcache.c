@@ -141,10 +141,12 @@ static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t
   return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
 }
 
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
 static GucStringCheckHook check_default_guc(const char *newval, void **extra, GucSource source)
 {
   return (GucStringCheckHook) newval;
 }
+#endif
 
 static GucStringAssignHook assign_default_servers_guc(const char *newval, bool doit, GucSource source)
 {
