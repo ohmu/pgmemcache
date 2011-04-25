@@ -1,5 +1,5 @@
 MODULE_big = pgmemcache
-PGMC_VERSION = 2.0.5
+PGMC_VERSION = 2.0.6
 
 OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
