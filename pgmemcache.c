@@ -729,6 +729,10 @@ static memcached_behavior get_memcached_behavior_flag (const char *flag)
     ret = MEMCACHED_BEHAVIOR_NUMBER_OF_REPLICAS;
   else if (strncmp ("MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ", flag, 41) == 0 || strncmp("RANDOMIZE_REPLICA_READ", flag, 22) == 0)
     ret = MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ;
+#if LIBMEMCACHED_VERSION_HEX >= 0x00049000
+  else if (strncmp ("MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS", flag, 40) == 0 || strncmp("REMOVE_FAILED_SERVERS", flag, 21) == 0)
+    ret = MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS;
+#endif
   else
     elog (ERROR, "Unknown memcached behavior flag: %s", flag);
 
