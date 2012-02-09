@@ -11,6 +11,10 @@
 #ifndef PGMEMCACHE_H
 #define PGMEMCACHE_H
 
+#include <libmemcached/memcached.h>
+#include <libmemcached/sasl.h>
+#include <libmemcached/server.h>
+#include <sasl/sasl.h>
 #include "postgres.h"
 #include <inttypes.h>
 #include "access/heapam.h"
@@ -23,10 +27,6 @@
 #include "utils/guc.h"
 #include "utils/memutils.h"
 #include "utils/lsyscache.h"
-#include <libmemcached/sasl.h>
-#include <libmemcached/memcached.h>
-#include <libmemcached/server.h>
-#include <sasl/sasl.h>
 
 #undef PACKAGE_BUGREPORT
 #undef PACKAGE_NAME
