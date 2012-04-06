@@ -28,14 +28,6 @@ static char *memcache_default_behavior = "";
 static char *memcache_sasl_authentication_username = "";
 static char *memcache_sasl_authentication_password = "";
 
-static sasl_callback_t sasl_callbacks[] =
-{
-  { SASL_CB_USER, &get_sasl_username, NULL},
-  { SASL_CB_AUTHNAME, &get_sasl_username, NULL},
-  { SASL_CB_PASS, &get_sasl_password, NULL},
-  { SASL_CB_LIST_END, NULL, NULL}
-};
-
 void _PG_init(void)
 {
   MemoryContext old_ctxt;
@@ -100,7 +92,7 @@ void _PG_init(void)
 			      (GucShowHook) show_memcache_sasl_authentication_username_guc);
 
   DefineCustomStringVariable ("pgmemcache.sasl_authentication_password",
-			      "pgmemcache SASL user authentication username",
+			      "pgmemcache SASL user authentication password",
 			      "Simple string pgmemcache.sasl_authentication_password = 'testing_password'",
 			      &memcache_sasl_authentication_password,
 			      NULL,
@@ -111,14 +103,27 @@ void _PG_init(void)
 #endif
 			      NULL,
 			      (GucShowHook) show_memcache_sasl_authentication_password_guc);
-#if 0
-  if ((memcache_sasl_authentication_username != "" && memcache_sasl_authentication_password != "") || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL)) {
-    if  (sasl_client_init(NULL) != SASL_OK)
-	elog(ERROR, "Failed to initialize SASL library!");
-    memcached_set_sasl_callbacks(globals.mc, sasl_callbacks);
-  }
+#if LIBMEMCACHED_WITH_SASL_SUPPORT
+  if ((strlen(memcache_sasl_authentication_username) > 0 && strlen(memcache_sasl_authentication_password) > 0) || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL)) {
+
+        rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
+        if (rc != MEMCACHED_SUCCESS) {
+	    elog(ERROR, "%s ", memcached_strerror(globals.mc, rc));
+        }
+        _init_sasl();
+      }
 #endif
+
 }
+#if LIBMEMCACHED_WITH_SASL_SUPPORT
+static int _init_sasl(void) {
+    int rc;
+    rc = sasl_client_init(NULL);
+    if (rc != SASL_OK)
+      elog(ERROR, "SASL init failed");
+    return true;
+}
+#endif
 
 static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
 {
@@ -224,7 +229,8 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
 				       (flag_buf.data),
 				       get_memcached_behavior_data
 				       (flag_buf.data, data_buf.data));
-
+	  if (rc != MEMCACHED_SUCCESS)
+	    elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
 	  /* Skip the element separator, reset buffers */
 	  i++;
 	  flag_buf.data[0] = '\0';
@@ -860,39 +866,4 @@ Datum memcache_stats(PG_FUNCTION_ARGS)
     elog(WARNING, "Failed to communicate with servers %s\n", memcached_strerror(globals.mc, rc));
 
   PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
-}
-
-static int get_sasl_username(void *context, int id, const char **result, unsigned int *len)
-{
-  if (!result || (id != SASL_CB_USER && id != SASL_CB_AUTHNAME))
-    return SASL_BADPARAM;
-  *result= memcache_sasl_authentication_username;
-  if (len)
-    *len= (memcache_sasl_authentication_username == NULL) ? 0 : (unsigned int) strlen(memcache_sasl_authentication_username);
-
-  return SASL_OK;
-}
-
-static int get_sasl_password(sasl_conn_t *conn, void *context, int id, sasl_secret_t **psecret)
-{
-  static sasl_secret_t* x;
-  size_t len;
-
-  if (!conn || ! psecret || id != SASL_CB_PASS)
-    return SASL_BADPARAM;
-
-  if (memcache_sasl_authentication_password == NULL) {
-    *psecret = NULL;
-    return SASL_OK;
-  }
-
-  len = strlen(memcache_sasl_authentication_password);
-  x = palloc(sizeof(sasl_secret_t) + len);
-  if (!x)
-    return SASL_NOMEM;
-
-  x->len = len;
-  strcpy((void *)x->data, memcache_sasl_authentication_password);
-  *psecret = x;
-  return SASL_OK;
 }

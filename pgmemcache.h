@@ -12,9 +12,6 @@
 #define PGMEMCACHE_H
 
 #include <libmemcached/memcached.h>
-#include <libmemcached/sasl.h>
-#include <libmemcached/server.h>
-#include <sasl/sasl.h>
 #include "postgres.h"
 #include <inttypes.h>
 #include "access/heapam.h"
@@ -66,8 +63,7 @@ static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const 
 static void pgmemcache_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context);
 static void *pgmemcache_realloc(memcached_st *ptr __attribute__((unused)), void *, const size_t, void *context);
 static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t, void *context);
-static int get_sasl_username(void *context, int id, const char **result, unsigned int *len);
-static int get_sasl_password(sasl_conn_t *conn, void *context, int id, sasl_secret_t **psecret);
+int _init_sasl(void) ;
 
 #define PG_MEMCACHE_ADD                 0x0001
 #define PG_MEMCACHE_REPLACE             0x0002
