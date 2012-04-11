@@ -8,9 +8,9 @@ Description: libmemcached interface for PostgreSQL
 Copyright: .
  Copyright 2010 Hannu Valtonen
 Build: sh
- make
+ make PG_CONFIG=/usr/lib/postgresql/PGVER/bin/pg_config
 Clean: sh
- make clean || true
+ make clean PG_CONFIG=/usr/lib/postgresql/PGVER/bin/pg_config || true
 Build-Depends: postgresql-server-dev-PGVER, flex | flex-old, bison, yada, libmemcached-dev, libpq-dev, devscripts, libsasl2-dev
 
 
@@ -23,6 +23,6 @@ Depends: []
 Description: memcached client functions for PostgreSQL
  .
 Install: sh
- make install DESTDIR=$ROOT
+ make install PG_CONFIG=/usr/lib/postgresql/PGVER/bin/pg_config DESTDIR=$ROOT
 
 

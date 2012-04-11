@@ -5,7 +5,8 @@ OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
 SHLIB_LINK = -lmemcached -lsasl2
 
-PGXS := $(shell pg_config --pgxs)
+PG_CONFIG = pg_config
+PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
 # Build a release tarball. To make a release, update PGMC_VERSION, adjust
