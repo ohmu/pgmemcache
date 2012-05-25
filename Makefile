@@ -1,5 +1,4 @@
 MODULE_big = pgmemcache
-PGMC_VERSION = 2.0.6
 
 OBJS = pgmemcache.o
 DATA_built = $(MODULE_big).sql
@@ -9,24 +8,17 @@ PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
-# Build a release tarball. To make a release, update PGMC_VERSION, adjust
-# the version number in the README, and add an entry to NEWS.
+# Build a release tarball. To make a release, adjust the
+# version number in the README, and add an entry to NEWS.
 html:
 	rst2html.py README README.html
 dist:
-	tar --exclude .git -cjf ../pgmemcache_$(PGMC_VERSION).tar.bz2 ../pgmemcache/
-deb84:
-	sed -e s/PGVER/8.4/g < debian/packages.in > debian/packages
-	yada rebuild
-	debuild -uc -us -b
-deb90:
-	sed -e s/PGVER/9.0/g < debian/packages.in > debian/packages
-	yada rebuild
-	debuild -uc -us -b
-deb91:
-	sed -e s/PGVER/9.1/g < debian/packages.in > debian/packages
+	git archive --format=tar --prefix=pgmemcache/ HEAD . | bzip2 -9 \
+	    > ../pgmemcache_$(shell git describe).tar.bz2
+deb%:
+	sed -e s/PGVER/$(subst deb,,$@)/g < debian/packages.in > debian/packages
+	sed -e s/PGMCVER/$(shell git describe)/g < debian/changelog.in > debian/changelog
 	yada rebuild
 	debuild -uc -us -b
 build-dep:
 	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison libsasl2-dev
-
