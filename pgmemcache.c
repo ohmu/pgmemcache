@@ -60,10 +60,10 @@ void _PG_init(void)
 			     PGC_USERSET,
 			     GUC_LIST_INPUT,
 #if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
-			     (GucStringCheckHook) check_default_guc,
+			     NULL,
 #endif
-			     (GucStringAssignHook) assign_default_servers_guc,
-			     (GucShowHook) show_default_servers_guc);
+			     assign_default_servers_guc,
+			     show_default_servers_guc);
 
   DefineCustomStringVariable ("pgmemcache.default_behavior",
 			      "Comma-separated list of memcached behavior (optional).",
@@ -73,10 +73,10 @@ void _PG_init(void)
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
 #if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
-			      (GucStringCheckHook) check_default_guc,
+			      NULL,
 #endif
-			      (GucStringAssignHook) assign_default_behavior_guc,
-			      (GucShowHook) show_default_behavior_guc);
+			      assign_default_behavior_guc,
+			      show_default_behavior_guc);
 
   DefineCustomStringVariable ("pgmemcache.sasl_authentication_username",
 			      "pgmemcache SASL user authentication username",
@@ -86,10 +86,10 @@ void _PG_init(void)
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
 #if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
-			      (GucStringCheckHook) check_default_guc,
+			      NULL,
 #endif
 			      NULL,
-			      (GucShowHook) show_memcache_sasl_authentication_username_guc);
+			      show_memcache_sasl_authentication_username_guc);
 
   DefineCustomStringVariable ("pgmemcache.sasl_authentication_password",
 			      "pgmemcache SASL user authentication password",
@@ -99,10 +99,10 @@ void _PG_init(void)
 			      PGC_USERSET,
 			      GUC_LIST_INPUT,
 #if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
-			      (GucStringCheckHook) check_default_guc,
+			      NULL,
 #endif
 			      NULL,
-			      (GucShowHook) show_memcache_sasl_authentication_password_guc);
+			      show_memcache_sasl_authentication_password_guc);
 #if LIBMEMCACHED_WITH_SASL_SUPPORT
   if ((strlen(memcache_sasl_authentication_username) > 0 && strlen(memcache_sasl_authentication_password) > 0) || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL)) {
 
@@ -113,7 +113,6 @@ void _PG_init(void)
         _init_sasl();
       }
 #endif
-
 }
 #if LIBMEMCACHED_WITH_SASL_SUPPORT
 static int _init_sasl(void) {
@@ -146,46 +145,38 @@ static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t
   return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
 }
 
-#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
-static GucStringCheckHook check_default_guc(const char *newval, void **extra, GucSource source)
-{
-  return (GucStringCheckHook) newval;
-}
-#endif
-
-static GucStringAssignHook assign_default_servers_guc(const char *newval, bool doit, GucSource source)
+static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
     do_server_add((char *) newval);
-  return (GucStringAssignHook) newval;
 }
 
-static GucShowHook show_default_servers_guc(void)
+static const char *show_default_servers_guc(void)
 {
-  return (GucShowHook) memcache_default_servers ? (GucShowHook) memcache_default_servers: (GucShowHook)"";
+  return memcache_default_servers ? memcache_default_servers: "";
 }
 
-static GucStringAssignHook assign_default_behavior_guc (const char *newval, bool doit, GucSource source)
+static void assign_default_behavior_guc (const char *newval, void *extra)
 {
-  return assign_default_behavior (newval);
+  assign_default_behavior (newval);
 }
 
-static GucShowHook show_default_behavior_guc (void)
+static const char *show_default_behavior_guc (void)
 {
-  return (GucShowHook) memcache_default_behavior ? (GucShowHook) memcache_default_behavior: (GucShowHook) "";
+  return memcache_default_behavior ? memcache_default_behavior : "";
 }
 
-static GucShowHook show_memcache_sasl_authentication_username_guc(void)
+static const char *show_memcache_sasl_authentication_username_guc(void)
 {
-  return (GucShowHook) memcache_sasl_authentication_username ? (GucShowHook) memcache_sasl_authentication_username: (GucShowHook)"";
+  return memcache_sasl_authentication_username ? memcache_sasl_authentication_username : "";
 }
 
-static GucShowHook show_memcache_sasl_authentication_password_guc(void)
+static const char *show_memcache_sasl_authentication_password_guc(void)
 {
-  return (GucShowHook) memcache_sasl_authentication_password ? (GucShowHook) memcache_sasl_authentication_password: (GucShowHook)"";
+  return memcache_sasl_authentication_password ? memcache_sasl_authentication_password : "";
 }
 
-static GucStringAssignHook assign_default_behavior (const char *newval)
+static void assign_default_behavior (const char *newval)
 {
   int i, len;
   StringInfoData flag_buf;
@@ -193,7 +184,7 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
   memcached_return rc;
   MemoryContext old_ctx;
   if (!newval)
-    return (GucStringAssignHook) newval;
+    return;
   old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
 
   initStringInfo (&flag_buf);
@@ -208,7 +199,7 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
       if (c == ',' || c == ':')
         {
 	  if (flag_buf.len == 0)
-	    return NULL;
+	    return;
 
 	  if (c == ':') {
 	    int j;
@@ -220,7 +211,7 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
 	      }
 
 	    if (data_buf.len == 0)
-	      return NULL;
+	      return;
 
 	    i += data_buf.len;
 	  }
@@ -247,8 +238,6 @@ static GucStringAssignHook assign_default_behavior (const char *newval)
   pfree (data_buf.data);
 
   MemoryContextSwitchTo(old_ctx);
-
-  return (GucStringAssignHook) newval;
 }
 
 /* This is called when we're being unloaded from a process. Note that
