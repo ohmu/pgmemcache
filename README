@@ -9,7 +9,7 @@ REQUIREMENTS:
 =============
 
 1) libmemcached 0.38 or newer (http://tangent.org/552/libmemcached.html)
-2) PostgreSQL 8.4 or newer recommended (http://www.postgresql.org/)
+2) PostgreSQL 9.1 or newer recommended (http://www.postgresql.org/)
 
 Always prefer the latest versions.
 
@@ -31,18 +31,15 @@ Also make sure that the pg_config binary is in your PATH (or edit the Makefile).
 ------------------------
 
 1) sudo make build-dep
-2) make deb84
+2) make deb9.2
 3) sudo dpkg -i ../postgresql-pgmemcache-*.deb
 
 SETUP (run this for all databases you want to use pgmemcache in):
 =================================================================
 
-The path below is the path for FreeBSD, it may be something different on your
-operating system.  The path is shown above during the `sudo make install`
-step: look in the output above if you're having problems.
 ::
 
-	% psql -f /usr/local/postgresql/share/contrib/pgmemcache.sql <mydbname>
+    % psql <mydbname> -c 'create extension pgmemcache'
 
 It is often more convenient to specify a list of memcached servers
 to connect to in postgresql.conf, rather than calling memcache_server_add()
