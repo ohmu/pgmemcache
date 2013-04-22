@@ -1,3 +1,12 @@
+pgmemcache 2.1.0
+================
+* CREATE EXTENSION support
+* PostgreSQL 9.2 support
+* Fix crashers on NULL inputs
+* Fix a random initialization failure on startup
+* Compatibility with newer libmemcached versions
+* Updated Debian packaging scripts
+
 pgmemcache 2.0.6
 ================
 * Fix building on earlier releases than 9.1. (thanks for the bugreport from Florian Von Block)
