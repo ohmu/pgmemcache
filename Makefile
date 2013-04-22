@@ -2,7 +2,7 @@ MODULE_big = pgmemcache
 OBJS = pgmemcache.o
 
 EXTENSION = pgmemcache
-DATA = pgmemcache--2.0.sql pgmemcache--unpackaged--2.0.sql
+DATA = pgmemcache--2.1.sql pgmemcache--2.0--2.1.sql pgmemcache--unpackaged--2.0.sql
 
 SHLIB_LINK = -lmemcached -lsasl2
 
