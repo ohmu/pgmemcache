@@ -58,7 +58,7 @@ in each new client connection. This can be done as follows:
        The flags correspond with libmemcached behavior flags. Check the libmemcached
        documentation for those. As an example behavior you might have a line like:
 
-       pgmemcache.default_behavior='BINARY_PROTOCOL:1'
+       pgmemcache.default_behavior='BINARY_NOREPLY:1'
 
        in your postgresql.conf
 

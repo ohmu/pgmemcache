@@ -31,6 +31,7 @@ static char *memcache_sasl_authentication_password = "";
 void _PG_init(void)
 {
   MemoryContext old_ctxt;
+  int rc;
 
   globals.pg_ctxt = AllocSetContextCreate(TopMemoryContext,
 					  "pgmemcache global context",
@@ -51,6 +52,14 @@ void _PG_init(void)
   }
 
   MemoryContextSwitchTo(old_ctxt);
+
+  /* Use memcache binary protocol by default as required for
+     memcached_(increment|decrement)_with_initial. */
+  rc = memcached_behavior_set (globals.mc,
+			       MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
+			       1);
+  if (rc != MEMCACHED_SUCCESS)
+    elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
 
   DefineCustomStringVariable("pgmemcache.default_servers",
 			     "Comma-separated list of memcached servers to connect to.",
