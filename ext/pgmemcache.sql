@@ -131,22 +131,22 @@ RETURNS bool
 AS 'MODULE_PATHNAME', 'memcache_prepend'
 LANGUAGE c STRICT;
 
-CREATE FUNCTION memcache_incr(key text, increment int)
-RETURNS int
+CREATE FUNCTION memcache_incr(key text, increment bigint)
+RETURNS bigint
 AS 'MODULE_PATHNAME', 'memcache_incr'
 LANGUAGE c STRICT;
 
 CREATE FUNCTION memcache_incr(key text)
-RETURNS int
+RETURNS bigint
 AS 'MODULE_PATHNAME', 'memcache_incr'
 LANGUAGE c STRICT;
 
-CREATE FUNCTION memcache_decr(key text, decrement int)
-RETURNS int
+CREATE FUNCTION memcache_decr(key text, decrement bigint)
+RETURNS bigint
 AS 'MODULE_PATHNAME', 'memcache_decr'
 LANGUAGE c STRICT;
 
 CREATE FUNCTION memcache_decr(key text)
-RETURNS int
+RETURNS bigint
 AS 'MODULE_PATHNAME', 'memcache_decr'
 LANGUAGE c STRICT;

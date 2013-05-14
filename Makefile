@@ -7,7 +7,8 @@ OBJS = pgmemcache.o
 EXTENSION = pgmemcache
 DATA_built = pgmemcache--$(short_ver).sql pgmemcache.control
 DATA =	ext/pgmemcache--unpackaged--2.0.sql \
-	ext/pgmemcache--2.0--2.1.sql
+	ext/pgmemcache--2.0--2.1.sql \
+	ext/pgmemcache--2.1--2.1.1.sql
 
 SHLIB_LINK = -lmemcached -lsasl2
 

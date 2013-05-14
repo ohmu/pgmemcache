@@ -267,7 +267,7 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
   char *key;
   size_t key_length;
   uint64_t val;
-  unsigned int offset = 1;
+  uint64_t offset = 1;
   memcached_return rc;
 
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
@@ -279,17 +279,27 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
     elog(ERROR, "memcache key too long");
 
   if (PG_NARGS() >= 2)
-    offset = PG_GETARG_UINT32(1);
+    offset = PG_GETARG_INT64(1);
+  if (offset < 0)
+    {
+      /* Cannot represent negative BIGINT values with uint64_t */
+      elog(ERROR, "offset cannot be negative");
+    }
 
   if (increment)
-    rc = memcached_increment (globals.mc, key, key_length, offset, &val);
+    rc = memcached_increment_with_initial (globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
   else
-    rc = memcached_decrement (globals.mc, key, key_length, offset, &val);
+    rc = memcached_decrement_with_initial (globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
 
-  if (rc != MEMCACHED_SUCCESS)
+  if (rc != MEMCACHED_SUCCESS) {
     elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
-
-  PG_RETURN_UINT32(val);
+  } else if (val > 0x7FFFFFFFFFFFFFFFLL && val != UINT64_MAX) {
+    /* Cannot represent uint64_t values above 2^63-1 with BIGINT.  Do
+       not signal error for UINT64_MAX which just means there was no
+       reply.  */
+    elog(ERROR, "value received from memcache is out of BIGINT range");
+  }
+  PG_RETURN_INT64(val);
 }
 
 Datum memcache_decr(PG_FUNCTION_ARGS)

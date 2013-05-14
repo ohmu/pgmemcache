@@ -87,7 +87,7 @@ central place in the code (normally wrapped in an IF statement).
 
 Adds a key to the cache cluster, if the key does not already exist.
 
-**newval = memcache_decr(key::TEXT, decrement::INT4)**
+**newval = memcache_decr(key::TEXT, decrement::INT8)**
 
 **newval = memcache_decr(key::TEXT)**
 
@@ -117,7 +117,7 @@ it returns the value of the key as TEXT. Note that zero-length values are allowe
 Fetches an ARRAY of keys from the cache, returns a list of RECORDs
 for the found keys, with the columns titled key and value.
 
-**newval = memcache_incr(key::TEXT, increment::INT4)**
+**newval = memcache_incr(key::TEXT, increment::INT8)**
 
 **newval = memcache_incr(key::TEXT)**
 
