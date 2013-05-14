@@ -1,8 +1,8 @@
-pgmemcache (PGMCVER) unstable; urgency=low
+pgmemcache (2.1.1) unstable; urgency=low
 
-  * vPGMCVER
+  * v2.1.1
 
- -- Hannu Valtonen <hannu.valtonen@ormod.com>  Thu, 24 May 2012 18:24:18 +0300
+ -- Oskari Saarenmaa <os@ohmu.fi>  Tue, 14 May 2013 15:02:04 +0300
 
 pgmemcache (2.0.6) unstable; urgency=low
 
