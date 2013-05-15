@@ -1,3 +1,10 @@
+pgmemcache 2.1.1
+================
+* Fix errors and warnings exposed by GCC 4.8
+* Make the memcache binary protocol the default
+* Change memcache_incr and memcache_decr to use BIGINT arguments for the
+  increment/decrement values
+
 pgmemcache 2.1.0
 ================
 * CREATE EXTENSION support
