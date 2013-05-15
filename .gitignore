@@ -1,0 +1,5 @@
+*~
+*.o
+*.so
+/pgmemcache.control
+/pgmemcache--*.sql

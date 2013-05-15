@@ -31,6 +31,7 @@ static char *memcache_sasl_authentication_password = "";
 void _PG_init(void)
 {
   MemoryContext old_ctxt;
+  int rc;
 
   globals.pg_ctxt = AllocSetContextCreate(TopMemoryContext,
 					  "pgmemcache global context",
@@ -51,6 +52,14 @@ void _PG_init(void)
   }
 
   MemoryContextSwitchTo(old_ctxt);
+
+  /* Use memcache binary protocol by default as required for
+     memcached_(increment|decrement)_with_initial. */
+  rc = memcached_behavior_set (globals.mc,
+			       MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
+			       1);
+  if (rc != MEMCACHED_SUCCESS)
+    elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
 
   DefineCustomStringVariable("pgmemcache.default_servers",
 			     "Comma-separated list of memcached servers to connect to.",
@@ -104,25 +113,17 @@ void _PG_init(void)
 			      NULL,
 			      show_memcache_sasl_authentication_password_guc);
 #if LIBMEMCACHED_WITH_SASL_SUPPORT
-  if ((strlen(memcache_sasl_authentication_username) > 0 && strlen(memcache_sasl_authentication_password) > 0) || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL)) {
-
-        rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
-        if (rc != MEMCACHED_SUCCESS) {
-	    elog(ERROR, "%s ", memcached_strerror(globals.mc, rc));
-        }
-        _init_sasl();
-      }
+  if ((strlen(memcache_sasl_authentication_username) > 0 && strlen(memcache_sasl_authentication_password) > 0) || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL))
+    {
+      int rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
+      if (rc != MEMCACHED_SUCCESS)
+        elog(ERROR, "%s ", memcached_strerror(globals.mc, rc));
+      rc = sasl_client_init(NULL);
+      if (rc != SASL_OK)
+        elog(ERROR, "SASL init failed");
+    }
 #endif
 }
-#if LIBMEMCACHED_WITH_SASL_SUPPORT
-static int _init_sasl(void) {
-    int rc;
-    rc = sasl_client_init(NULL);
-    if (rc != SASL_OK)
-      elog(ERROR, "SASL init failed");
-    return true;
-}
-#endif
 
 static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
 {
@@ -266,7 +267,7 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
   char *key;
   size_t key_length;
   uint64_t val;
-  unsigned int offset = 1;
+  uint64_t offset = 1;
   memcached_return rc;
 
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
@@ -278,17 +279,27 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
     elog(ERROR, "memcache key too long");
 
   if (PG_NARGS() >= 2)
-    offset = PG_GETARG_UINT32(1);
+    offset = PG_GETARG_INT64(1);
+  if (offset < 0)
+    {
+      /* Cannot represent negative BIGINT values with uint64_t */
+      elog(ERROR, "offset cannot be negative");
+    }
 
   if (increment)
-    rc = memcached_increment (globals.mc, key, key_length, offset, &val);
+    rc = memcached_increment_with_initial (globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
   else
-    rc = memcached_decrement (globals.mc, key, key_length, offset, &val);
+    rc = memcached_decrement_with_initial (globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
 
-  if (rc != MEMCACHED_SUCCESS)
+  if (rc != MEMCACHED_SUCCESS) {
     elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
-
-  PG_RETURN_UINT32(val);
+  } else if (val > 0x7FFFFFFFFFFFFFFFLL && val != UINT64_MAX) {
+    /* Cannot represent uint64_t values above 2^63-1 with BIGINT.  Do
+       not signal error for UINT64_MAX which just means there was no
+       reply.  */
+    elog(ERROR, "value received from memcache is out of BIGINT range");
+  }
+  PG_RETURN_INT64(val);
 }
 
 Datum memcache_decr(PG_FUNCTION_ARGS)
@@ -814,9 +825,13 @@ static uint64_t get_memcached_distribution_type (const char *data)
   return ret;
 }
 
-static memcached_return_t server_stat_function(const memcached_st *ptr __attribute__((unused)),
-					       const memcached_server_st *server,
-					       void *context)
+/* NOTE: memcached_server_fn specifies that the first argument is const, but
+ * memcached_stat_get_keys wants a non-const argument so we don't define it
+ * as const here.
+ */
+static memcached_return_t server_stat_function(memcached_st *ptr,
+                                               memcached_server_instance_st server,
+                                               void *context)
 {
   char **list, **stat_ptr;
   memcached_return rc;
@@ -847,7 +862,7 @@ Datum memcache_stats(PG_FUNCTION_ARGS)
   memcached_server_fn callbacks[1];
 
   initStringInfo(&buf);
-  callbacks[0]= server_stat_function;
+  callbacks[0] = (memcached_server_fn) server_stat_function;
   appendStringInfo(&buf, "\n");
   rc = memcached_server_cursor(globals.mc, callbacks, (void *)&buf, 1);
 

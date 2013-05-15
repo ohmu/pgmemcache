@@ -1,5 +1,5 @@
 # pgmemcache extension
 comment = 'memcached interface'
-default_version = '2.1'
+default_version = '__short_ver__'
 module_pathname = '$libdir/pgmemcache'
 relocatable = true
