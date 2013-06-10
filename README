@@ -160,13 +160,13 @@ replace the value of something in the cache with its new value.
 ::
 
 	CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
-		BEGIN
+	BEGIN
 		IF OLD.passwd != NEW.passwd THEN
 			PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
 		END IF;
 		RETURN NEW;
 	END;
-	$$ LANGUAGE 'plpgsql';
+	$$ LANGUAGE plpgsql;
 
 Activate the trigger for UPDATEs.
 
@@ -182,7 +182,8 @@ invalidate the cached data, but not replace it.
 			PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
 		END IF;
 		RETURN NEW;
-	END;$$ LANGUAGE 'plpgsql';
+	END;
+	$$ LANGUAGE plpgsql;
 
 Here's an example delete trigger::
 
@@ -191,7 +192,7 @@ Here's an example delete trigger::
 		PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
 		RETURN OLD;
 	END;
-	$$ LANGUAGE 'plpgsql';
+	$$ LANGUAGE plpgsql;
 
 Activate the trigger for DELETEs
 
@@ -206,25 +207,25 @@ clause).  For the exact license terms, see the file "COPYING".
 CONTACT:
 ========
 
-Bug reports and patches are very welcome, either submitted via the PgFoundry
-web interface (http://pgfoundry.org/projects/pgmemcache), or sent via email
-to <hannu.valtonen@ormod.com>.
+pgmemcache is currently maintained by Hannu Valtonen and Oskari Saarenmaa
+from Ohmu Ltd, they can be contacted at <pgmemcache@ohmu.fi>.
 
-HISTORY:
+Bug reports and patches are very welcome; issues should be reported in
+GitHub's issue interface (https://github.com/ohmu/pgmemcache) and patches
+and other enhancement proposals should be submitted as GitHub pull requests.
+
+CREDITS:
 ========
 
 pgmemcache was originally written by Sean Chittenden. During version 1.1
-times it was maintained by Neil Conway.  Since version 2.0 pgmemcache was
-rewritten to work on top of libmemcached and the maintainership moved to
-Hannu Valtonen.
+times it was maintained by Neil Conway.  During version 1.x series starting
+from 1.1, development of pgmemcache was sponsored by the Open Technology
+Group, Inc.  (OTG).  OTG provides training in a wide range of open source
+software, including pgmemcache and PostgreSQL training.  For more
+information, see http://www.otg-nc.com/
 
-During version 1.x series starting from 1.1, development of pgmemcache was
-sponsored by the Open Technology Group, Inc.  (OTG).  OTG provides training
-in a wide range of open source software, including pgmemcache and PostgreSQL
-training.  For more information, see http://www.otg-nc.com/
-
-THANKS:
-=======
+Since version 2.0 pgmemcache was rewritten to work on top of libmemcached
+and the maintainership moved to Hannu Valtonen.
 
 Suzuki Hironobu contributed major patches for the 2.0 series, among other
 things, support for libmemcached configuration settings.  F-Secure

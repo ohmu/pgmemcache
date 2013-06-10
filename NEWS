@@ -1,30 +1,38 @@
 pgmemcache DEV
 ==============
-* Fix versioning when building without git
+
+* Fix versioning when building without git (reported by Patryk Kordylewski)
 
 pgmemcache 2.1.1
 ================
+
 * Fix errors and warnings exposed by GCC 4.8
 * Make the memcache binary protocol the default
 * Change memcache_incr and memcache_decr to use BIGINT arguments for the
-  increment/decrement values
+  increment/decrement values (patch from Markus Holmberg / F-Secure)
 
 pgmemcache 2.1.0
 ================
+
 * CREATE EXTENSION support
 * PostgreSQL 9.2 support
 * Fix crashers on NULL inputs
-* Fix a random initialization failure on startup
+* Fix a random initialization failure on startup, this fixes errors such as:
+    """WARNING:  invalid value for parameter "pgmemcache.default_servers":
+                 "example.org"
+       ERROR: NO SERVERS DEFINED"""
 * Compatibility with newer libmemcached versions
 * Updated Debian packaging scripts
 
 pgmemcache 2.0.6
 ================
-* Fix building on earlier releases than 9.1. (thanks for the bugreport from Florian Von Block)
+
+* Fix building on earlier releases than 9.1 (reported by Florian Von Block)
 * Add libsasl2-dev to build deps
 
 pgmemcache 2.0.5
 ================
+
 * Some preliminary work on SASL support
 * Make pgmemcache work with PG 9.1
 * Support for building debs against PG 9.0 and 9.1
@@ -33,57 +41,72 @@ pgmemcache 2.0.5
 
 pgmemcache 2.0.4
 ================
+
 * Add support for building an HTML doc out of the README.pgmemcache
-* Make pgmemcache work with libmemcached's 0.39 and 0.40 which again break API compatibility
-   * Remove memcache_stats(TEXT) (Note, memcache_stats() is still supported)
+* Make pgmemcache work with libmemcached's 0.39 and 0.40 which again break
+  API compatibility
+* Remove memcache_stats(TEXT) (Note, memcache_stats() is still supported)
 
 pgmemcache 2.0.3
-===================
-* Add support for all libmemcached 0.38 behaviors (a few had been added since these were updated the last time)
-* Add preliminary Debian packaging support, documentation was updated a bit to reflect this.
+================
+
+* Add support for all libmemcached 0.38 behaviors (a few had been added
+  since these were updated the last time)
+* Add preliminary Debian packaging support, documentation was updated a bit
+  to reflect this
 
 pgmemcache 2.0.2
-===================
-* Make pgmemcache work with libmemcached 0.38 memory allocators.
-This bumps up pgmemcache's libmemcached requirement up to 0.38.
+================
+
+* Make pgmemcache work with libmemcached 0.38 memory allocators
+* This bumps up pgmemcache's libmemcached requirement up to 0.38
 
 pgmemcache 2.0.1
-===================
+================
+
 * Remove some deprecated documentation
-* Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks to Marc Munro for
-pointing out the problem and a fix for it.
-* Make libmemcached use PostgreSQL memory allocation routines. (requires libmemcached 0.31+), based on a patch from
-Peter Meszaros with some editorialization by Hannu Valtonen. Note this bumps up our libmemcached minimum requirement to 0.31.
+* Fix bug "[#1010761] Crash with pgmemcache 2.0.0 and postgres 8.4", thanks
+  to Marc Munro for pointing out the problem and a fix for it
+* Make libmemcached use PostgreSQL memory allocation routines. (requires
+  libmemcached 0.31+), based on a patch from Peter Meszaros with some
+  editorialization by Hannu Valtonen
+* Note this bumps up our libmemcached minimum requirement to 0.31
 
 pgmemcache 2.0.0
-===================
+================
+
 Finally a 2.0.0 release.
 
 * Fix default (unset) GUC crashes, based on a patch from Claes Jakobsson
 * Add BYTEA memcache_get
-* Add TEXT[], BYTEA[] memcache_get_multi for the reduction of server roundtrips
+* Add TEXT[], BYTEA[] memcache_get_multi for the reduction of server
+  roundtrips
 
 pgmemcache 2.0 RC 1
 ===================
+
 It looks likely that this is the last release before stamping this as 2.0.
 
-* Fix pgmemcache not to throw an error when trying to delete a non-existent key from memcache.
-(based on a report from Chander Ganesan)
+* Fix pgmemcache not to throw an error when trying to delete a non-existent
+  key from memcache (based on a report from Chander Ganesan)
 
 pgmemcache 2.0 beta2
 ====================
+
 On the way towards a 2.0 release:
 
-* Make pgmemcache work on top of older versions of PostgreSQL (at least 8.3, probably earlier)
-* Make libmemcached behavior configurable through PostgreSQL GUCs.
+* Make pgmemcache work on top of older versions of PostgreSQL
+  (at least 8.3, probably earlier)
+* Make libmemcached behavior configurable through PostgreSQL GUCs
 * prepend/append support
 
 pgmemcache 2.0 beta1
 ====================
 
-pgmemcache was completely rewritten to work on top of libmemcached. It requires PostgreSQL 8.4+ and
-is not backwards compatible with older versions of PostgreSQL. That may or may not change depending
-on how much are people interested in having it work on older versions.
+pgmemcache was completely rewritten to work on top of libmemcached.  It
+requires PostgreSQL 8.4+ and is not backwards compatible with older versions
+of PostgreSQL.  That may or may not change depending on how much are people
+interested in having it work on older versions.
 
 Also some API's were deprecated:
 * memcache_server_find_hash
