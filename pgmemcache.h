@@ -107,10 +107,4 @@ PG_FUNCTION_INFO_V1(memcache_append);
 PG_FUNCTION_INFO_V1(memcache_append_absexpire);
 PG_FUNCTION_INFO_V1(memcache_stats);
 
-#endif
-
-typedef struct
-{
-  char **keys;
-  size_t *key_lens;
-} internal_fctx;
+#endif /* !PGMEMCACHE_H */

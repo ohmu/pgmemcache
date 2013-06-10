@@ -114,7 +114,8 @@ void _PG_init(void)
                              show_memcache_sasl_authentication_password_guc);
 
 #if LIBMEMCACHED_WITH_SASL_SUPPORT
-  if ((strlen(memcache_sasl_authentication_username) > 0 && strlen(memcache_sasl_authentication_password) > 0) || (memcache_sasl_authentication_username != NULL && memcache_sasl_authentication_password != NULL))
+  if (memcache_sasl_authentication_username != NULL && strlen(memcache_sasl_authentication_username) > 0 &&
+      memcache_sasl_authentication_password != NULL && strlen(memcache_sasl_authentication_password) > 0)
     {
       int rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
       if (rc != MEMCACHED_SUCCESS)
@@ -420,9 +421,12 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   size_t *key_lens, value_length;
   FuncCallContext *funcctx;
   MemoryContext oldcontext;
-  internal_fctx *fctx;
   TupleDesc tupdesc;
   AttInMetadata *attinmeta;
+  struct internal_fctx {
+      char **keys;
+      size_t *key_lens;
+  } *fctx;
 
   if (PG_ARGISNULL(0))
     elog(ERROR, "memcache get_multi key cannot be null");
@@ -445,7 +449,7 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
         ereport(ERROR,
                 (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("function returning record called in context that cannot accept type record")));
-      fctx = (internal_fctx *) palloc(sizeof(internal_fctx));
+      fctx = (struct internal_fctx *) palloc(sizeof(*fctx));
 
       get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
 
@@ -682,163 +686,97 @@ static memcached_return do_server_add(char *host_str)
   return rc;
 }
 
-static memcached_behavior get_memcached_behavior_flag(const char *flag)
+#define MC_STR_TO_ENUM(d,v) \
+  if (strncmp(value, "MEMCACHED_" #d "_" #v, 9 + sizeof(#d) + sizeof(#v)) == 0 || \
+      strncmp(value, #v, sizeof(#v) - 1) == 0) \
+      return MEMCACHED_##d##_##v
+
+static memcached_behavior get_memcached_behavior_flag(const char *value)
 {
-  memcached_behavior ret = -1;
-
-  /*Sort by flag in reverse order. */
-  if (strncmp("MEMCACHED_BEHAVIOR_USE_UDP", flag, 26) == 0 || strncmp("USE_UDP", flag, 7) == 0)
-    ret = MEMCACHED_BEHAVIOR_USE_UDP;
-  else if (strncmp("MEMCACHED_BEHAVIOR_NO_BLOCK", flag, 27) == 0 || strncmp("NO_BLOCK", flag, 8) == 0)
-    ret = MEMCACHED_BEHAVIOR_NO_BLOCK;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SND_TIMEOUT", flag, 30) == 0 || strncmp("SND_TIMEOUT", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_SND_TIMEOUT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY", flag, 39) == 0 || strncmp("HASH_WITH_PREFIX_KEY", flag, 21) == 0)
-    ret = MEMCACHED_BEHAVIOR_HASH_WITH_PREFIX_KEY;
-  else if (strncmp("MEMCACHED_BEHAVIOR_RCV_TIMEOUT", flag, 30) == 0 || strncmp("RCV_TIMEOUT", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_RCV_TIMEOUT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_TCP_NODELAY", flag, 30) == 0 || strncmp("TCP_NODELAY", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_TCP_NODELAY;
-  else if (strncmp("MEMCACHED_BEHAVIOR_HASH", flag, 23) == 0 || strncmp("HASH", flag, 4) == 0)
-    ret = MEMCACHED_BEHAVIOR_HASH;
-  else if (strncmp("MEMCACHED_BEHAVIOR_DISTRIBUTION", flag, 31) == 0 || strncmp("DISTRIBUTION", flag, 12) == 0)
-    ret = MEMCACHED_BEHAVIOR_DISTRIBUTION;
-  else if (strncmp("MEMCACHED_BEHAVIOR_CACHE_LOOKUPS", flag, 33) == 0 || strncmp("CACHE_LOOKUPS", flag, 14) == 0)
-    ret = MEMCACHED_BEHAVIOR_CACHE_LOOKUPS;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SUPPORT_CAS", flag, 30) == 0 || strncmp("SUPPORT_CAS", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_SUPPORT_CAS;
-  else if (strncmp("MEMCACHED_BEHAVIOR_KETAMA", flag, 25) == 0 || strncmp("KETAMA", flag, 6) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA;
-  else if (strncmp("MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED", flag, 34) == 0 || strncmp("KETAMA_WEIGHTED", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
-  else if (strncmp("MEMCACHED_BEHAVIOR_KETAMA_HASH", flag, 30) == 0 || strncmp("KETAMA_HASH", flag, 11) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA_HASH;
-  /* XXX: this doesn't seem to exist in libmemcached anymore, remove?
-  else if (strncmp("MEMCACHED_BEHAVIOR_KETAMA_COMPAT", flag, 32) == 0 || strncmp("KETAMA_COMPAT", flag, 13) == 0)
-    ret = MEMCACHED_BEHAVIOR_KETAMA_COMPAT;
-  */
-  else if (strncmp("MEMCACHED_BEHAVIOR_POLL_TIMEOUT", flag, 31) == 0 || strncmp("POLL_TIMEOUT", flag, 12) == 0)
-    ret = MEMCACHED_BEHAVIOR_POLL_TIMEOUT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_USER_DATA", flag, 28) == 0 || strncmp("USER_DATA", flag, 9) == 0)
-    ret = MEMCACHED_BEHAVIOR_USER_DATA;
-  else if (strncmp("MEMCACHED_BEHAVIOR_BUFFER_REQUESTS", flag, 34) == 0 || strncmp("BUFFER_REQUESTS", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_BUFFER_REQUESTS;
-  else if (strncmp("MEMCACHED_BEHAVIOR_VERIFY_KEY", flag, 29) == 0 || strncmp("VERIFY_KEY", flag, 10) == 0)
-    ret = MEMCACHED_BEHAVIOR_VERIFY_KEY;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SORT_HOSTS", flag, 29) == 0 || strncmp("SORT_HOSTS", flag, 10) == 0)
-    ret = MEMCACHED_BEHAVIOR_SORT_HOSTS;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE", flag, 35) == 0 || strncmp("SOCKET_SEND_SIZE", flag, 16) == 0)
-    ret = MEMCACHED_BEHAVIOR_SOCKET_SEND_SIZE;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE", flag, 35) == 0 || strncmp("SOCKET_RECV_SIZE", flag, 16) == 0)
-    ret = MEMCACHED_BEHAVIOR_SOCKET_RECV_SIZE;
-  else if (strncmp("MEMCACHED_BEHAVIOR_RETRY_TIMEOUT", flag, 32) == 0 || strncmp("RETRY_TIMEOUT", flag, 13) == 0)
-    ret = MEMCACHED_BEHAVIOR_RETRY_TIMEOUT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT", flag, 34) == 0 || strncmp("CONNECT_TIMEOUT", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_BINARY_PROTOCOL", flag, 34) == 0 || strncmp("BINARY_PROTOCOL", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_BINARY_PROTOCOL;
-  else if (strncmp("MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT", flag, 39) == 0 || strncmp("SERVER_FAILURE_LIMIT", flag, 20) == 0)
-    ret = MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT;
-  else if (strncmp("MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK", flag, 35) == 0 || strncmp("IO_MSG_WATERMARK", flag, 16) == 0)
-    ret = MEMCACHED_BEHAVIOR_IO_MSG_WATERMARK;
-  else if (strncmp("MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK", flag, 37) == 0 || strncmp("IO_BYTES_WATERMARK", flag, 18) == 0)
-    ret = MEMCACHED_BEHAVIOR_IO_BYTES_WATERMARK;
-  else if (strncmp("MEMCACHED_BEHAVIOR_IO_KEY_PREFETCH", flag, 34) == 0 || strncmp("IO_KEY_PREFETCH", flag, 15) == 0)
-    ret = MEMCACHED_BEHAVIOR_IO_KEY_PREFETCH;
-  else if (strncmp("MEMCACHED_BEHAVIOR_NOREPLY", flag, 26) == 0 || strncmp("NOREPLY", flag, 7) == 0)
-    ret = MEMCACHED_BEHAVIOR_NOREPLY;
-  else if (strncmp("MEMCACHED_BEHAVIOR_NUMBER_OF_REPLICAS", flag, 37) == 0 || strncmp("NUMBER_OF_REPLICAS", flag, 18) == 0)
-    ret = MEMCACHED_BEHAVIOR_NUMBER_OF_REPLICAS;
-  else if (strncmp("MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ", flag, 41) == 0 || strncmp("RANDOMIZE_REPLICA_READ", flag, 22) == 0)
-    ret = MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ;
+  MC_STR_TO_ENUM(BEHAVIOR, BINARY_PROTOCOL);
+  MC_STR_TO_ENUM(BEHAVIOR, BUFFER_REQUESTS);
+  MC_STR_TO_ENUM(BEHAVIOR, CACHE_LOOKUPS);
+  MC_STR_TO_ENUM(BEHAVIOR, CONNECT_TIMEOUT);
+  MC_STR_TO_ENUM(BEHAVIOR, DISTRIBUTION);
+  MC_STR_TO_ENUM(BEHAVIOR, HASH);
+  MC_STR_TO_ENUM(BEHAVIOR, HASH_WITH_PREFIX_KEY);
+  MC_STR_TO_ENUM(BEHAVIOR, IO_BYTES_WATERMARK);
+  MC_STR_TO_ENUM(BEHAVIOR, IO_KEY_PREFETCH);
+  MC_STR_TO_ENUM(BEHAVIOR, IO_MSG_WATERMARK);
+  MC_STR_TO_ENUM(BEHAVIOR, KETAMA);
+  MC_STR_TO_ENUM(BEHAVIOR, KETAMA_HASH);
+  MC_STR_TO_ENUM(BEHAVIOR, KETAMA_WEIGHTED);
+  MC_STR_TO_ENUM(BEHAVIOR, NO_BLOCK);
+  MC_STR_TO_ENUM(BEHAVIOR, NOREPLY);
+  MC_STR_TO_ENUM(BEHAVIOR, NUMBER_OF_REPLICAS);
+  MC_STR_TO_ENUM(BEHAVIOR, POLL_TIMEOUT);
+  MC_STR_TO_ENUM(BEHAVIOR, RANDOMIZE_REPLICA_READ);
+  MC_STR_TO_ENUM(BEHAVIOR, RCV_TIMEOUT);
+  MC_STR_TO_ENUM(BEHAVIOR, RETRY_TIMEOUT);
+  MC_STR_TO_ENUM(BEHAVIOR, SERVER_FAILURE_LIMIT);
+  MC_STR_TO_ENUM(BEHAVIOR, SND_TIMEOUT);
+  MC_STR_TO_ENUM(BEHAVIOR, SOCKET_RECV_SIZE);
+  MC_STR_TO_ENUM(BEHAVIOR, SOCKET_SEND_SIZE);
+  MC_STR_TO_ENUM(BEHAVIOR, SORT_HOSTS);
+  MC_STR_TO_ENUM(BEHAVIOR, SUPPORT_CAS);
+  MC_STR_TO_ENUM(BEHAVIOR, TCP_NODELAY);
+  MC_STR_TO_ENUM(BEHAVIOR, USER_DATA);
+  MC_STR_TO_ENUM(BEHAVIOR, USE_UDP);
+  MC_STR_TO_ENUM(BEHAVIOR, VERIFY_KEY);
 #if LIBMEMCACHED_VERSION_HEX >= 0x00049000
-  else if (strncmp("MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS", flag, 40) == 0 || strncmp("REMOVE_FAILED_SERVERS", flag, 21) == 0)
-    ret = MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS;
+  MC_STR_TO_ENUM(BEHAVIOR, REMOVE_FAILED_SERVERS);
 #endif
-  else
-    elog(ERROR, "Unknown memcached behavior flag: %s", flag);
 
-  return ret;
+  elog(ERROR, "Unknown memcached behavior flag: %s", value);
+  return -1;
 }
 
-static uint64_t get_memcached_behavior_data(const char *flag, const char *data)
+static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
 {
   char *endptr;
-  memcached_behavior f_code = get_memcached_behavior_flag(flag);
   uint64_t ret;
 
-  switch (f_code)
+  switch (get_memcached_behavior_flag(flag))
     {
     case MEMCACHED_BEHAVIOR_HASH:
     case MEMCACHED_BEHAVIOR_KETAMA_HASH:
-      ret = get_memcached_hash_type(data);
-      break;
+      return get_memcached_hash_type(data);
     case MEMCACHED_BEHAVIOR_DISTRIBUTION:
-      ret = get_memcached_distribution_type(data);
-      break;
+      return get_memcached_distribution_type(data);
     default:
       ret = strtol(data, &endptr, 10);
       if (endptr == data)
         elog(ERROR, "invalid memcached behavior param %s: %s", flag, data);
+      return ret;
     }
-
-  return ret;
 }
 
-static uint64_t get_memcached_hash_type(const char *data)
+static uint64_t get_memcached_hash_type(const char *value)
 {
-  uint64_t ret;
+  MC_STR_TO_ENUM(HASH, MURMUR);
+  MC_STR_TO_ENUM(HASH, MD5);
+  MC_STR_TO_ENUM(HASH, JENKINS);
+  MC_STR_TO_ENUM(HASH, HSIEH);
+  MC_STR_TO_ENUM(HASH, FNV1A_64);
+  MC_STR_TO_ENUM(HASH, FNV1A_32);
+  MC_STR_TO_ENUM(HASH, FNV1_64);
+  MC_STR_TO_ENUM(HASH, FNV1_32);
+  MC_STR_TO_ENUM(HASH, DEFAULT);
+  MC_STR_TO_ENUM(HASH, CRC);
 
-  /* Sort by data in reverse order. */
-  if (strncmp("MEMCACHED_HASH_MURMUR", data, 21) == 0 || strncmp("MURMUR", data, 6) == 0)
-    ret = MEMCACHED_HASH_MURMUR;
-  else if (strncmp("MEMCACHED_HASH_MD5", data, 18) == 0 || strncmp("MD5", data, 3) == 0)
-    ret = MEMCACHED_HASH_MD5;
-  else if (strncmp("MEMCACHED_HASH_JENKINS", data, 22) == 0 || strncmp("JENKINS", data, 7) == 0)
-    ret = MEMCACHED_HASH_JENKINS;
-  else if (strncmp("MEMCACHED_HASH_HSIEH", data, 20) == 0 || strncmp("HSIEH", data, 5) == 0)
-    ret = MEMCACHED_HASH_HSIEH;
-  else if (strncmp("MEMCACHED_HASH_FNV1A_64", data, 23) == 0 || strncmp("FNV1A_64", data, 8) == 0)
-    ret = MEMCACHED_HASH_FNV1A_64;
-  else if (strncmp("MEMCACHED_HASH_FNV1A_32", data, 23) == 0 || strncmp("FNV1A_32", data, 8) == 0)
-    ret = MEMCACHED_HASH_FNV1A_32;
-  else if (strncmp("MEMCACHED_HASH_FNV1_64", data, 22) == 0 || strncmp("FNV1_64", data, 7) == 0)
-    ret = MEMCACHED_HASH_FNV1_64;
-  else if (strncmp("MEMCACHED_HASH_FNV1_32", data, 22) == 0 || strncmp("FNV1_32", data, 7) == 0)
-    ret = MEMCACHED_HASH_FNV1_32;
-  else if (strncmp("MEMCACHED_HASH_DEFAULT", data, 22) == 0 || strncmp("DEFAULT", data, 7) == 0)
-    ret = MEMCACHED_HASH_DEFAULT;
-  else if (strncmp("MEMCACHED_HASH_CRC", data, 18) == 0 || strncmp("CRC", data, 3) == 0)
-    ret = MEMCACHED_HASH_CRC;
-  else
-    {
-      ret = 0xffffffff; /* to avoid warning */
-      elog(ERROR, "invalid hash name: %s", data);
-    }
-
-  return ret;
+  elog(ERROR, "invalid hash name: %s", value);
+  return 0xffffffff; /* to avoid warning */
 }
 
-static uint64_t get_memcached_distribution_type(const char *data)
+static uint64_t get_memcached_distribution_type(const char *value)
 {
-  uint64_t ret;
+  MC_STR_TO_ENUM(DISTRIBUTION, RANDOM);
+  MC_STR_TO_ENUM(DISTRIBUTION, MODULA);
+  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT_KETAMA);
+  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT);
 
-  /* Sort by data in reverse order. */
-  if (strncmp("MEMCACHED_DISTRIBUTION_RANDOM", data, 29) == 0 || strncmp("RANDOM", data, 6) == 0)
-    ret = MEMCACHED_DISTRIBUTION_RANDOM;
-  else if (strncmp("MEMCACHED_DISTRIBUTION_MODULA", data, 29) == 0 || strncmp("MODULA", data, 6) == 0)
-    ret = MEMCACHED_DISTRIBUTION_MODULA;
-  else if (strncmp("MEMCACHED_DISTRIBUTION_CONSISTENT_KETAMA", data, 40) == 0 || strncmp("CONSISTENT_KETAMA", data, 17) == 0)
-    ret = MEMCACHED_DISTRIBUTION_CONSISTENT_KETAMA;
-  else if (strncmp("MEMCACHED_DISTRIBUTION_CONSISTENT", data, 33) == 0 || strncmp("CONSISTENT", data, 10) == 0)
-    ret = MEMCACHED_DISTRIBUTION_CONSISTENT;
-  else
-    {
-      ret = 0xffffffff; /* to avoid warning */
-      elog(ERROR, "invalid distribution name: %s", data);
-    }
-
-  return ret;
+  elog(ERROR, "invalid distribution name: %s", value);
+  return 0xffffffff; /* to avoid warning */
 }
 
 /* NOTE: memcached_server_fn specifies that the first argument is const, but
