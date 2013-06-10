@@ -1,5 +1,5 @@
-short_ver = $(shell git describe --abbrev=0)
-long_ver = $(shell git describe --long)
+short_ver = 2.1.1
+long_ver = $(shell git describe --long 2>/dev/null || echo $(short_ver)-0-unknown)
 
 MODULE_big = pgmemcache
 OBJS = pgmemcache.o

@@ -1,3 +1,7 @@
+pgmemcache DEV
+==============
+* Fix versioning when building without git
+
 pgmemcache 2.1.1
 ================
 * Fix errors and warnings exposed by GCC 4.8
