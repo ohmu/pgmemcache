@@ -59,7 +59,8 @@ void _PG_init(void)
                               MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
                               1);
   if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
+    elog(WARNING, "pgmemcache: memcached_behavior_set(BINARY_PROTOCOL): %s",
+                  memcached_strerror(globals.mc, rc));
 
   DefineCustomStringVariable("pgmemcache.default_servers",
                              "Comma-separated list of memcached servers to connect to.",
@@ -119,10 +120,11 @@ void _PG_init(void)
     {
       int rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
       if (rc != MEMCACHED_SUCCESS)
-        elog(ERROR, "%s ", memcached_strerror(globals.mc, rc));
+        elog(ERROR, "pgmemcache: memcached_set_sasl_auth_data: %s",
+                    memcached_strerror(globals.mc, rc));
       rc = sasl_client_init(NULL);
       if (rc != SASL_OK)
-        elog(ERROR, "SASL init failed");
+        elog(ERROR, "pgmemcache: sasl_client_init failed: %d", rc)
     }
 #endif
 }
@@ -225,7 +227,8 @@ static void assign_default_behavior(const char *newval)
                                       get_memcached_behavior_data(
                                         flag_buf.data, data_buf.data));
           if (rc != MEMCACHED_SUCCESS)
-            elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
+            elog(WARNING, "pgmemcache: memcached_behavior_set: %s",
+                          memcached_strerror(globals.mc, rc));
           /* Skip the element separator, reset buffers */
           i++;
           flag_buf.data[0] = '\0';
@@ -277,16 +280,16 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
   key_length = strlen(key);
 
   if (key_length < 1)
-    elog(ERROR, "memcache key cannot be an empty string");
+    elog(ERROR, "pgmemcache: key cannot be an empty string");
   if (key_length >= 250)
-    elog(ERROR, "memcache key too long");
+    elog(ERROR, "pgmemcache: key too long");
 
   if (PG_NARGS() >= 2)
     offset = PG_GETARG_INT64(1);
   if (offset < 0)
     {
       /* Cannot represent negative BIGINT values with uint64_t */
-      elog(ERROR, "offset cannot be negative");
+      elog(ERROR, "pgmemcache: offset cannot be negative");
     }
 
   if (increment)
@@ -296,14 +299,18 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
 
   if (rc != MEMCACHED_SUCCESS)
     {
-      elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
+      elog(WARNING, "pgmemcache: memcached_%s_with_initial: %s",
+                    increment ? "increment" : "decrement",
+                    memcached_strerror(globals.mc, rc));
     }
   else if (val > 0x7FFFFFFFFFFFFFFFLL && val != UINT64_MAX)
     {
       /* Cannot represent uint64_t values above 2^63-1 with BIGINT.  Do
          not signal error for UINT64_MAX which just means there was no
          reply.  */
-      elog(ERROR, "value received from memcache is out of BIGINT range");
+      elog(ERROR, "pgmemcache: memcached_%s_with_initial: %s",
+                  increment ? "increment" : "decrement",
+                  "value received from memcache is out of BIGINT range");
     }
   PG_RETURN_INT64(val);
 }
@@ -324,9 +331,9 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(key_to_be_deleted)));
   key_length = strlen(key);
   if (key_length < 1)
-    elog(ERROR, "memcache key cannot be an empty string");
+    elog(ERROR, "pgmemcache: key cannot be an empty string");
   if (key_length >= 250)
-    elog(ERROR, "memcache key too long");
+    elog(ERROR, "pgmemcache: key too long");
 
   hold = (time_t) 0.0;
   if (PG_NARGS() >= 2 && PG_ARGISNULL(1) == false)
@@ -335,7 +342,8 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
   rc = memcached_delete(globals.mc, key, key_length, hold);
 
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
-    elog(WARNING, "%s ", memcached_strerror(globals.mc, rc));
+    elog(WARNING, "pgmemcache: memcached_delete: %s",
+                  memcached_strerror(globals.mc, rc));
 
   PG_RETURN_BOOL(rc == 0);
 }
@@ -366,7 +374,8 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
 
   rc = memcached_flush(globals.mc, opt_expire);
   if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "%s", memcached_strerror(globals.mc, rc));
+    elog(WARNING, "pgmemcache: memcached_flush: %s",
+                  memcached_strerror(globals.mc, rc));
 
   PG_RETURN_BOOL(rc == 0);
 }
@@ -380,7 +389,7 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   memcached_return rc;
 
   if (PG_ARGISNULL(0))
-    elog(ERROR, "memcache key cannot be NULL");
+    elog(ERROR, "pgmemcache: key cannot be NULL");
 
   get_key = PG_GETARG_TEXT_P(0);
 
@@ -388,14 +397,15 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   key_length = strlen(key);
 
   if (key_length < 1)
-    elog(ERROR, "memcache key cannot be an empty string");
+    elog(ERROR, "pgmemcache: key cannot be an empty string");
   if (key_length >= 250)
-    elog(ERROR, "memcache key too long");
+    elog(ERROR, "pgmemcache: key too long");
 
   string = memcached_get(globals.mc, key, key_length, &return_value_length, &flags, &rc);
 
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
-    elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+    elog(ERROR, "pgmemcache: memcached_get: %s",
+                memcached_strerror(globals.mc, rc));
 
   if (rc == MEMCACHED_NOTFOUND)
     PG_RETURN_NULL();
@@ -429,11 +439,12 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   } *fctx;
 
   if (PG_ARGISNULL(0))
-    elog(ERROR, "memcache get_multi key cannot be null");
+    elog(ERROR, "pgmemcache: get_multi key cannot be null");
 
   array = PG_GETARG_ARRAYTYPE_P(0);
   if (ARR_NDIM(array) != 1)
-    elog(ERROR, "pgmemcache only supports single dimension ARRAYs, not: ARRAYs with %d dimensions", ARR_NDIM(array));
+    elog(ERROR, "pgmemcache: only single dimension ARRAYs are supported, "
+                "not ARRAYs with %d dimensions", ARR_NDIM(array));
 
   array_lbound = ARR_LBOUND(array)[0];
   array_length = ARR_DIMS(array)[0];
@@ -474,7 +485,8 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
       rc = memcached_mget(globals.mc, (const char **) keys, key_lens, array_length);
       if (rc != MEMCACHED_SUCCESS)
-        elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+        elog(ERROR, "pgmemcache: memcached_mget: %s",
+                    memcached_strerror(globals.mc, rc));
 
       if (rc == MEMCACHED_NOTFOUND)
         PG_RETURN_NULL();
@@ -502,7 +514,8 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
         }
       else if (rc != MEMCACHED_SUCCESS)
         {
-          elog(ERROR, "%s", memcached_strerror(globals.mc, rc));
+          elog(ERROR, "pgmemcache: memcached_fetch: %s",
+                      memcached_strerror(globals.mc, rc));
           SRF_RETURN_DONE(funcctx);
         }
       values = (char **) palloc(2 * sizeof(char *));
@@ -576,18 +589,18 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
   bool ret;
 
   if (PG_ARGISNULL(0))
-    elog(ERROR, "memcache key cannot be NULL");
+    elog(ERROR, "pgmemcache: key cannot be NULL");
   if (PG_ARGISNULL(1))
-    elog(ERROR, "memcache value cannot be NULL");
+    elog(ERROR, "pgmemcache: value cannot be NULL");
 
   key = PG_GETARG_TEXT_P(0);
   key_length = VARSIZE(key) - VARHDRSZ;
 
   /* These aren't really needed as we set libmemcached behavior to check for all invalid sets */
   if (key_length < 1)
-    elog(ERROR, "memcache key cannot be an empty string");
+    elog(ERROR, "pgmemcache: key cannot be an empty string");
   if (key_length >= 250)
-    elog(ERROR, "memcache key too long");
+    elog(ERROR, "pgmemcache: key too long");
 
   val = PG_GETARG_TEXT_P(1);
   val_length = VARSIZE(val) - VARHDRSZ;
@@ -631,27 +644,43 @@ static bool do_memcache_set_cmd(int type, char *key, size_t key_length,
                                 char *value, size_t value_length, time_t expiration)
 {
   memcached_return rc = 1; /*FIXME GCC Warning hack*/
+  const char *func = NULL;
 
   if (type & PG_MEMCACHE_ADD)
-    rc = memcached_add(globals.mc, key, key_length, value, value_length, expiration, 0);
+    {
+      func = "memcached_add";
+      rc = memcached_add(globals.mc, key, key_length, value, value_length, expiration, 0);
+    }
   else if (type & PG_MEMCACHE_REPLACE)
-    rc = memcached_replace(globals.mc, key, key_length, value, value_length, expiration, 0);
+    {
+      func = "memcached_replace";
+      rc = memcached_replace(globals.mc, key, key_length, value, value_length, expiration, 0);
+    }
   else if (type & PG_MEMCACHE_SET)
-    rc = memcached_set(globals.mc, key, key_length, value, value_length, expiration, 0);
+    {
+      func = "memcached_set";
+      rc = memcached_set(globals.mc, key, key_length, value, value_length, expiration, 0);
+    }
   else if (type & PG_MEMCACHE_PREPEND)
-    rc = memcached_prepend(globals.mc, key, key_length, value, value_length, expiration, 0);
+    {
+      func = "memcached_prepend";
+      rc = memcached_prepend(globals.mc, key, key_length, value, value_length, expiration, 0);
+    }
   else if (type & PG_MEMCACHE_APPEND)
-    rc = memcached_append(globals.mc, key, key_length, value, value_length, expiration, 0);
-  else if (type & PG_MEMCACHE_PREPEND)
-    rc = memcached_prepend(globals.mc, key, key_length, value, value_length, expiration, 0);
-  else if (type & PG_MEMCACHE_APPEND)
-    rc = memcached_append(globals.mc, key, key_length, value, value_length, expiration, 0);
+    {
+      func = "memcached_append";
+      rc = memcached_append(globals.mc, key, key_length, value, value_length, expiration, 0);
+    }
   else
-    elog(ERROR, "unknown pgmemcache set command type: %d", type);
+    {
+      elog(ERROR, "pgmemcache: unknown set command type: %d", type);
+      return false;
+    }
 
   if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "%s", memcached_strerror(globals.mc, rc));
-  return (rc == 0);
+    elog(WARNING, "pgmemcache: %s: %s", func,
+                  memcached_strerror(globals.mc, rc));
+  return rc == MEMCACHED_SUCCESS;
 }
 
 Datum memcache_server_add(PG_FUNCTION_ARGS)
@@ -664,7 +693,8 @@ Datum memcache_server_add(PG_FUNCTION_ARGS)
 
   rc = do_server_add(host_str);
   if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "%s", memcached_strerror(globals.mc, rc));
+    elog(WARNING, "pgmemcache: memcached_server_push: %s",
+                  memcached_strerror(globals.mc, rc));
 
   PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
@@ -727,7 +757,7 @@ static memcached_behavior get_memcached_behavior_flag(const char *value)
   MC_STR_TO_ENUM(BEHAVIOR, REMOVE_FAILED_SERVERS);
 #endif
 
-  elog(ERROR, "Unknown memcached behavior flag: %s", value);
+  elog(ERROR, "pgmemcache: unknown behavior flag: %s", value);
   return -1;
 }
 
@@ -746,9 +776,10 @@ static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
     default:
       ret = strtol(data, &endptr, 10);
       if (endptr == data)
-        elog(ERROR, "invalid memcached behavior param %s: %s", flag, data);
+        elog(ERROR, "pgmemcache: invalid behavior param %s: %s", flag, data);
       return ret;
     }
+  return ret;
 }
 
 static uint64_t get_memcached_hash_type(const char *value)
@@ -764,7 +795,7 @@ static uint64_t get_memcached_hash_type(const char *value)
   MC_STR_TO_ENUM(HASH, DEFAULT);
   MC_STR_TO_ENUM(HASH, CRC);
 
-  elog(ERROR, "invalid hash name: %s", value);
+  elog(ERROR, "pgmemcache: invalid hash name: %s", value);
   return 0xffffffff; /* to avoid warning */
 }
 
@@ -775,7 +806,7 @@ static uint64_t get_memcached_distribution_type(const char *value)
   MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT_KETAMA);
   MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT);
 
-  elog(ERROR, "invalid distribution name: %s", value);
+  elog(ERROR, "pgmemcache: invalid distribution name: %s", value);
   return 0xffffffff; /* to avoid warning */
 }
 
@@ -821,7 +852,8 @@ Datum memcache_stats(PG_FUNCTION_ARGS)
   rc = memcached_server_cursor(globals.mc, callbacks, (void *) &buf, 1);
 
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_SOME_ERRORS)
-    elog(WARNING, "Failed to communicate with servers %s\n", memcached_strerror(globals.mc, rc));
+    elog(WARNING, "pgmemcache: memcache_stats: %s",
+                  memcached_strerror(globals.mc, rc));
 
   PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
 }
