@@ -15,18 +15,16 @@ PG_MODULE_MAGIC;
 #endif
 
 /* Per-backend global state. */
-struct memcache_global
+static struct memcache_global_s
 {
   memcached_st *mc;
   /* context in which long-lived state is allocated */
   MemoryContext pg_ctxt;
-};
-
-static struct memcache_global globals;
-static char *memcache_default_servers = "";
-static char *memcache_default_behavior = "";
-static char *memcache_sasl_authentication_username = "";
-static char *memcache_sasl_authentication_password = "";
+  char *default_servers;
+  char *default_behavior;
+  char *sasl_authentication_username;
+  char *sasl_authentication_password;
+} globals;
 
 void _PG_init(void)
 {
@@ -65,7 +63,7 @@ void _PG_init(void)
   DefineCustomStringVariable("pgmemcache.default_servers",
                              "Comma-separated list of memcached servers to connect to.",
                              "Specified as a comma-separated list of host:port (port is optional).",
-                             &memcache_default_servers,
+                             &globals.default_servers,
                              NULL,
                              PGC_USERSET,
                              GUC_LIST_INPUT,
@@ -73,12 +71,12 @@ void _PG_init(void)
                              NULL,
 #endif
                              assign_default_servers_guc,
-                             show_default_servers_guc);
+                             NULL);
 
   DefineCustomStringVariable("pgmemcache.default_behavior",
                              "Comma-separated list of memcached behavior (optional).",
                              "Specified as a comma-separated list of behavior_flag:behavior_data.",
-                             &memcache_default_behavior,
+                             &globals.default_behavior,
                              NULL,
                              PGC_USERSET,
                              GUC_LIST_INPUT,
@@ -86,12 +84,12 @@ void _PG_init(void)
                              NULL,
 #endif
                              assign_default_behavior_guc,
-                             show_default_behavior_guc);
+                             NULL);
 
   DefineCustomStringVariable("pgmemcache.sasl_authentication_username",
                              "pgmemcache SASL user authentication username",
                              "Simple string pgmemcache.sasl_authentication_username = 'testing_username'",
-                             &memcache_sasl_authentication_username,
+                             &globals.sasl_authentication_username,
                              NULL,
                              PGC_USERSET,
                              GUC_LIST_INPUT,
@@ -99,12 +97,12 @@ void _PG_init(void)
                              NULL,
 #endif
                              NULL,
-                             show_memcache_sasl_authentication_username_guc);
+                             NULL);
 
   DefineCustomStringVariable("pgmemcache.sasl_authentication_password",
                              "pgmemcache SASL user authentication password",
                              "Simple string pgmemcache.sasl_authentication_password = 'testing_password'",
-                             &memcache_sasl_authentication_password,
+                             &globals.sasl_authentication_password,
                              NULL,
                              PGC_USERSET,
                              GUC_LIST_INPUT,
@@ -112,13 +110,17 @@ void _PG_init(void)
                              NULL,
 #endif
                              NULL,
-                             show_memcache_sasl_authentication_password_guc);
+                             NULL);
 
 #if LIBMEMCACHED_WITH_SASL_SUPPORT
-  if (memcache_sasl_authentication_username != NULL && strlen(memcache_sasl_authentication_username) > 0 &&
-      memcache_sasl_authentication_password != NULL && strlen(memcache_sasl_authentication_password) > 0)
+  /* XXX: does this work?  We should probably add an assign_hook for these
+   * so that memcache sasl data is updated when the values are changed. */
+  if (globals.sasl_authentication_username != NULL && strlen(globals.sasl_authentication_username) > 0 &&
+      globals.sasl_authentication_password != NULL && strlen(globals.sasl_authentication_password) > 0)
     {
-      int rc = memcached_set_sasl_auth_data(globals.mc, memcache_sasl_authentication_username, memcache_sasl_authentication_password);
+      int rc = memcached_set_sasl_auth_data(globals.mc,
+                                            globals.sasl_authentication_username,
+                                            globals.sasl_authentication_password);
       if (rc != MEMCACHED_SUCCESS)
         elog(ERROR, "pgmemcache: memcached_set_sasl_auth_data: %s",
                     memcached_strerror(globals.mc, rc));
@@ -153,35 +155,10 @@ static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t
 static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
-    do_server_add((char *) newval);
-}
-
-static const char *show_default_servers_guc(void)
-{
-  return memcache_default_servers ? memcache_default_servers: "";
+    do_server_add(newval);
 }
 
 static void assign_default_behavior_guc(const char *newval, void *extra)
-{
-  assign_default_behavior(newval);
-}
-
-static const char *show_default_behavior_guc(void)
-{
-  return memcache_default_behavior ? memcache_default_behavior : "";
-}
-
-static const char *show_memcache_sasl_authentication_username_guc(void)
-{
-  return memcache_sasl_authentication_username ? memcache_sasl_authentication_username : "";
-}
-
-static const char *show_memcache_sasl_authentication_password_guc(void)
-{
-  return memcache_sasl_authentication_password ? memcache_sasl_authentication_password : "";
-}
-
-static void assign_default_behavior(const char *newval)
 {
   int i, len;
   StringInfoData flag_buf;
@@ -699,7 +676,7 @@ Datum memcache_server_add(PG_FUNCTION_ARGS)
   PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
-static memcached_return do_server_add(char *host_str)
+static memcached_return do_server_add(const char *host_str)
 {
   memcached_server_st *servers;
   memcached_return rc;
