@@ -2,6 +2,7 @@ pgmemcache DEV
 ==============
 
 * Fix versioning when building without git (reported by Patryk Kordylewski)
+* Code refactoring with minor fixes and consistent indentation and style
 
 pgmemcache 2.1.1
 ================
