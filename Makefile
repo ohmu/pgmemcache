@@ -37,5 +37,13 @@ deb%:
 	yada rebuild
 	debuild -uc -us -b
 
+rpm:
+	git archive --output=pgmemcache-rpm-src.tar.gz --prefix=pgmemcache/ HEAD
+	rpmbuild -ta pgmemcache-rpm-src.tar.gz \
+		--define 'full_version $(long_ver)' \
+		--define 'major_version $(short_ver)' \
+		--define 'minor_version $(subst -,.,$(subst $(short_ver)-,,$(long_ver)))'
+	$(RM) pgmemcache-rpm-src.tar.gz
+
 build-dep:
 	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison libsasl2-dev
