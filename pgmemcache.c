@@ -126,7 +126,7 @@ void _PG_init(void)
                     memcached_strerror(globals.mc, rc));
       rc = sasl_client_init(NULL);
       if (rc != SASL_OK)
-        elog(ERROR, "pgmemcache: sasl_client_init failed: %d", rc)
+        elog(ERROR, "pgmemcache: sasl_client_init failed: %d", rc);
     }
 #endif
 }
