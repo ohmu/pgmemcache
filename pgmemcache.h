@@ -2,11 +2,11 @@
  * PostgreSQL functions to interface with memcache.
  *
  * Copyright (c) 2004-2005 Sean Chittenden <sean@chittenden.org>
- * Copyright (c) 2007 Neil Conway <neilc@samurai.com>
+ * Copyright (c) 2007-2008 Neil Conway <neilc@samurai.com>
  * Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
- * Copyright (c) 2008-2011 Hannu Valtonen <hannu.valtonen@ormod.com>
+ * Copyright (c) 2008-2013 Hannu Valtonen <hannu.valtonen@ohmu.fi>
  *
- * See the file COPYING for distribution terms.
+ * See the file LICENSE for distribution terms.
  */
 #ifndef PGMEMCACHE_H
 #define PGMEMCACHE_H
