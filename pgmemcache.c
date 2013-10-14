@@ -441,8 +441,12 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
       get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
 
-      keys = palloc(sizeof(char *) * array_length);
-      key_lens = palloc(sizeof(size_t) * array_length);
+      keys = palloc(sizeof(char *) * (array_length + 1 /* extra key for last memcached_fetch call */ ));
+      key_lens = palloc(sizeof(size_t) * (array_length + 1));
+
+      // initialize terminating extra-key
+      keys[ array_length ] = 0;
+      key_lens[ array_length ] = 0;
 
       for (i = 0; i < array_length; i++)
         {
