@@ -441,8 +441,12 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
       get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
 
-      keys = palloc(sizeof(char *) * array_length);
-      key_lens = palloc(sizeof(size_t) * array_length);
+      keys = palloc(sizeof(char *) * (array_length + 1 /* extra key for last memcached_fetch call */ ));
+      key_lens = palloc(sizeof(size_t) * (array_length + 1));
+
+      // initialize terminating extra-key
+      keys[ array_length ] = 0;
+      key_lens[ array_length ] = 0;
 
       for (i = 0; i < array_length; i++)
         {
@@ -496,11 +500,15 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
           SRF_RETURN_DONE(funcctx);
         }
       values = (char **) palloc(2 * sizeof(char *));
-      values[0] = (char *) palloc(fctx->key_lens[funcctx->call_cntr] * sizeof(char));
-      values[1] = (char *) palloc(value_length * sizeof(char));
+      values[0] = (char *) palloc((fctx->key_lens[funcctx->call_cntr] + /* additional space for terminating zero character */ 1) * sizeof(char));
+      values[1] = (char *) palloc((value_length + /* additional space for terminating zero character */ 1) * sizeof(char));
 
       memcpy(values[0], fctx->keys[funcctx->call_cntr], fctx->key_lens[funcctx->call_cntr]);
       memcpy(values[1], value, value_length);
+
+      // BuildTupleFromCStrings needs correct zero-terminated C-string, so terminate our raw strings
+      values[0][ fctx->key_lens[funcctx->call_cntr] ] = '\0';
+      values[1][ value_length ] = '\0';
 
       tuple = BuildTupleFromCStrings(attinmeta, values);
       result = HeapTupleGetDatum(tuple);
