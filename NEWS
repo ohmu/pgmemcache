@@ -1,6 +1,8 @@
-pgmemcache DEV
-==============
+pgmemcache 2.1.2
+================
 
+* memcache_get_multi crash fixes (Maxim Kuzevanov)
+* RPM packaging support
 * Fix versioning when building without git (reported by Patryk Kordylewski)
 * Code refactoring with minor fixes and consistent indentation and style
 
