@@ -818,7 +818,7 @@ static memcached_return_t server_stat_function(memcached_st *ptr,
     {
       char *value = memcached_stat_get_value(ptr, &stat, *stat_ptr, &rc);
       appendStringInfo(context, "%s: %s\n", *stat_ptr, value);
-      pfree(value);
+      libmc_stat_free(value);
     }
 
   pfree(list);
