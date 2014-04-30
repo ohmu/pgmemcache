@@ -36,6 +36,13 @@
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
 
+/* libmemcached 1.0.16 changed the allocation function for values returned from memcached_stat_get_value */
+#if LIBMEMCACHED_VERSION_HEX >= 0x01000016
+  #define libmc_stat_free free
+#else
+  #define libmc_stat_free pfree
+#endif
+
 void _PG_init(void);
 void _PG_fini(void);
 
