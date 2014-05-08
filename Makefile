@@ -10,6 +10,7 @@ DATA =	ext/pgmemcache--unpackaged--2.0.sql \
 	ext/pgmemcache--2.0--2.1.sql \
 	ext/pgmemcache--2.1--2.1.1.sql \
 	ext/pgmemcache--2.1.1--2.1.2.sql
+REGRESS = init start_memcached test stop_memcached
 
 SHLIB_LINK = -lmemcached -lsasl2
 
