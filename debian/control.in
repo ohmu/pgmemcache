@@ -1,0 +1,14 @@
+Source: pgmemcache
+Section: database
+Priority: extra
+Maintainer: Ohmu Opensource <opensource@ohmu.fi>
+Build-Depends: debhelper (>= 8), postgresql-server-dev-PGVERSION, libmemcached-dev (>= 0.38~), libsasl2-dev
+Standards-Version: 3.9.5
+Homepage: https://github.com/ohmu/pgmemcache/
+
+Package: postgresql-pgmemcache-PGVERSION
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, postgresql-PGVERSION
+Description: PostgreSQL interface to memcached
+ pgmemcache is a set of PostgreSQL user-defined functions that provide
+ an interface to memcached.
