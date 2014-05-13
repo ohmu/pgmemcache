@@ -1,0 +1,69 @@
+\i test.sql
+SELECT memcache_server_add('localhost');
+ memcache_server_add 
+---------------------
+ t
+(1 row)
+
+SELECT regexp_replace(memcache_stats(), 'pid:.*', '') AS memcache_stats;
+      memcache_stats       
+---------------------------
+                          +
+ Server: localhost (11211)+
+ 
+(1 row)
+
+SELECT memcache_delete('jeah');
+ memcache_delete 
+-----------------
+ f
+(1 row)
+
+SELECT memcache_set('jeah','test_value1');
+ memcache_set 
+--------------
+ t
+(1 row)
+
+SELECT memcache_add('counter','10');
+ memcache_add 
+--------------
+ t
+(1 row)
+
+SELECT memcache_incr('counter', 30);
+ memcache_incr 
+---------------
+            40
+(1 row)
+
+SELECT memcache_get('counter');
+ memcache_get 
+--------------
+ 40
+(1 row)
+
+SELECT memcache_decr('counter');
+ memcache_decr 
+---------------
+            39
+(1 row)
+
+SELECT memcache_delete('counter');
+ memcache_delete 
+-----------------
+ t
+(1 row)
+
+SELECT memcache_get('counter');
+ memcache_get 
+--------------
+ 
+(1 row)
+
+SELECT memcache_get('jeah');
+ memcache_get 
+--------------
+ test_value1
+(1 row)
+
