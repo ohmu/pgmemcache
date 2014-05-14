@@ -35,9 +35,9 @@ dist:
 deb%:
 	cp debian/changelog.in debian/changelog
 	dch -v $(long_ver) "Automatically built package"
-	sed -e s/PGVER/$(subst deb,,$@)/g < debian/packages.in > debian/packages
-	yada rebuild
-	debuild -uc -us -b
+	sed -e s/PGVERSION/$(subst deb,,$@)/g < debian/control.in > debian/control
+	echo $(subst deb,,$@) > debian/pgversions
+	dpkg-buildpackage -uc -us
 
 rpm:
 	git archive --output=pgmemcache-rpm-src.tar.gz --prefix=pgmemcache/ HEAD
