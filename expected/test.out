@@ -1,5 +1,5 @@
 \i test.sql
-SELECT memcache_server_add('localhost');
+SELECT memcache_server_add('localhost:33211');
  memcache_server_add 
 ---------------------
  t
@@ -9,7 +9,7 @@ SELECT regexp_replace(memcache_stats(), 'pid:.*', '') AS memcache_stats;
       memcache_stats       
 ---------------------------
                           +
- Server: localhost (11211)+
+ Server: localhost (33211)+
  
 (1 row)
 

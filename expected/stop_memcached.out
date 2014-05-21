@@ -1,2 +1,1 @@
-\! service memcached stop
-Stopping memcached: memcached.
+\! kill `cat $HOME/.pgmemcache-memcached.pid`

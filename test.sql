@@ -1,4 +1,4 @@
-SELECT memcache_server_add('localhost');
+SELECT memcache_server_add('localhost:33211');
 SELECT regexp_replace(memcache_stats(), 'pid:.*', '') AS memcache_stats;
 SELECT memcache_delete('jeah');
 SELECT memcache_set('jeah','test_value1');
