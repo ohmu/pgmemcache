@@ -144,6 +144,8 @@ static time_t interval_to_time_t(Interval *span)
   result = span->time;
 #endif
 
+  result += span->day * 86400;
+
   if (span->month != 0)
     {
       result += (365.25 * 86400) * (span->month / 12);
