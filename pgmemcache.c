@@ -17,6 +17,8 @@ PG_MODULE_MAGIC;
 #endif
 
 /* Internal functions */
+static void pgmemcache_reset_context(void);
+static void assign_sasl_params(const char *username, const char *password);
 static void assign_default_servers_guc(const char *newval, void *extra);
 static void assign_default_behavior_guc(const char *newval, void *extra);
 static memcached_behavior get_memcached_behavior_flag(const char *flag);
@@ -26,7 +28,6 @@ static uint64_t get_memcached_distribution_type(const char *data);
 static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS);
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(const char *host_str);
-
 
 /* Per-backend global state. */
 static struct memcache_global_s
@@ -41,18 +42,7 @@ static struct memcache_global_s
 
 void _PG_init(void)
 {
-  int rc;
-
-  globals.mc = memcached_create(NULL);
-
-  /* Use memcache binary protocol by default as required for
-     memcached_(increment|decrement)_with_initial. */
-  rc = memcached_behavior_set(globals.mc,
-                              MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
-                              1);
-  if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "pgmemcache: memcached_behavior_set(BINARY_PROTOCOL): %s",
-                  memcached_strerror(globals.mc, rc));
+  pgmemcache_reset_context();
 
   DefineCustomStringVariable("pgmemcache.default_servers",
                              "Comma-separated list of memcached servers to connect to.",
@@ -106,23 +96,9 @@ void _PG_init(void)
                              NULL,
                              NULL);
 
-#if LIBMEMCACHED_WITH_SASL_SUPPORT
-  /* XXX: does this work?  We should probably add an assign_hook for these
-   * so that memcache sasl data is updated when the values are changed. */
-  if (globals.sasl_authentication_username != NULL && strlen(globals.sasl_authentication_username) > 0 &&
-      globals.sasl_authentication_password != NULL && strlen(globals.sasl_authentication_password) > 0)
-    {
-      int rc = memcached_set_sasl_auth_data(globals.mc,
-                                            globals.sasl_authentication_username,
-                                            globals.sasl_authentication_password);
-      if (rc != MEMCACHED_SUCCESS)
-        elog(ERROR, "pgmemcache: memcached_set_sasl_auth_data: %s",
-                    memcached_strerror(globals.mc, rc));
-      rc = sasl_client_init(NULL);
-      if (rc != SASL_OK)
-        elog(ERROR, "pgmemcache: sasl_client_init failed: %d", rc);
-    }
-#endif
+  /* XXX: We should have real assign_hook for these so that memcache sasl data
+   * is updated when the values are changed.  */
+  assign_sasl_params(globals.sasl_authentication_username, globals.sasl_authentication_password);
 }
 
 /* This is called when we're being unloaded from a process. Note that
@@ -155,10 +131,56 @@ static time_t interval_to_time_t(Interval *span)
   return (time_t) result;
 }
 
+static void pgmemcache_reset_context(void)
+{
+  int rc;
+
+  if (globals.mc)
+    {
+      memcached_free(globals.mc);
+      globals.mc = NULL;
+    }
+
+  globals.mc = memcached_create(NULL);
+
+  /* Always use the memcache binary protocol as required for
+     memcached_(increment|decrement)_with_initial. */
+  rc = memcached_behavior_set(globals.mc,
+                              MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
+                              1);
+  if (rc != MEMCACHED_SUCCESS)
+    elog(WARNING, "pgmemcache: memcached_behavior_set(BINARY_PROTOCOL): %s",
+                  memcached_strerror(globals.mc, rc));
+
+  assign_default_behavior_guc(globals.default_behavior, NULL);
+  assign_sasl_params(globals.sasl_authentication_username, globals.sasl_authentication_password);
+}
+
+static void assign_sasl_params(const char *username, const char *password)
+{
+#if LIBMEMCACHED_WITH_SASL_SUPPORT
+  if (username != NULL && strlen(username) > 0 && password != NULL && strlen(password) > 0)
+    {
+      int rc = memcached_set_sasl_auth_data(globals.mc, username, password);
+      if (rc != MEMCACHED_SUCCESS)
+        elog(ERROR, "pgmemcache: memcached_set_sasl_auth_data: %s",
+                    memcached_strerror(globals.mc, rc));
+      rc = sasl_client_init(NULL);
+      if (rc != SASL_OK)
+        elog(ERROR, "pgmemcache: sasl_client_init failed: %d", rc);
+    }
+#endif
+}
+
 static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
-    do_server_add(newval);
+    {
+      /* there is no way to remove servers from a memcache context, so
+       * recreate it from scratch when the server list changes */
+      pgmemcache_reset_context();
+      do_server_add(newval);
+    }
 }
 
 static void assign_default_behavior_guc(const char *newval, void *extra)
