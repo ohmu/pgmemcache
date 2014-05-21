@@ -1,3 +1,11 @@
+pgmemcache 2.1.3-DEV
+====================
+
+* debian: new packaging to replace yada which is not available in
+  Debian Wheezy anymore (Oskari Saarenmaa)
+* Use pg_regress for make installcheck testing (Christoph Berg)
+* fix memcache_stats() with libmemcached 1.0.16+ (Mika Eloranta)
+
 pgmemcache 2.1.2
 ================
 
