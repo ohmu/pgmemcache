@@ -18,8 +18,6 @@ PG_MODULE_MAGIC;
 static struct memcache_global_s
 {
   memcached_st *mc;
-  /* context in which long-lived state is allocated */
-  MemoryContext pg_ctxt;
   char *default_servers;
   char *default_behavior;
   char *sasl_authentication_username;
@@ -28,28 +26,9 @@ static struct memcache_global_s
 
 void _PG_init(void)
 {
-  MemoryContext old_ctxt;
   int rc;
 
-  globals.pg_ctxt = AllocSetContextCreate(TopMemoryContext,
-                                          "pgmemcache global context",
-                                          ALLOCSET_SMALL_MINSIZE,
-                                          ALLOCSET_SMALL_INITSIZE,
-                                          ALLOCSET_SMALL_MAXSIZE);
-
-  old_ctxt = MemoryContextSwitchTo(globals.pg_ctxt);
   globals.mc = memcached_create(NULL);
-
-  if (memcached_set_memory_allocators(globals.mc,
-                                      (memcached_malloc_fn) pgmemcache_malloc,
-                                      (memcached_free_fn) pgmemcache_free,
-                                      (memcached_realloc_fn) pgmemcache_realloc,
-                                      (memcached_calloc_fn) pgmemcache_calloc,
-                                      NULL) != MEMCACHED_SUCCESS) {
-    elog(ERROR, "pgmemcache: unable to set memory allocators");
-  }
-
-  MemoryContextSwitchTo(old_ctxt);
 
   /* Use memcache binary protocol by default as required for
      memcached_(increment|decrement)_with_initial. */
@@ -131,27 +110,6 @@ void _PG_init(void)
 #endif
 }
 
-static void *pgmemcache_malloc(memcached_st *ptr __attribute__((unused)), const size_t size, void *context)
-{
-  return MemoryContextAllocZero(globals.pg_ctxt, size);
-}
-
-static void pgmemcache_free(memcached_st *ptr __attribute__((unused)), void *mem, void *context)
-{
-  pfree(mem);
-}
-
-static void *pgmemcache_realloc(memcached_st *ptr __attribute__((unused)), void *mem, const size_t size, void *context)
-{
-  /* postgresql repalloc() fails if 'mem' is NULL */
-  return mem ? repalloc(mem, (Size)size) : MemoryContextAllocZero(globals.pg_ctxt, size);
-}
-
-static void *pgmemcache_calloc(memcached_st *ptr __attribute__((unused)), size_t nelem, const size_t size, void *context)
-{
-  return MemoryContextAllocZero(globals.pg_ctxt, nelem * size);
-}
-
 static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
@@ -164,10 +122,8 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
   StringInfoData flag_buf;
   StringInfoData data_buf;
   memcached_return rc;
-  MemoryContext old_ctx;
   if (!newval)
     return;
-  old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
 
   initStringInfo(&flag_buf);
   initStringInfo(&data_buf);
@@ -220,8 +176,6 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
     }
   pfree(flag_buf.data);
   pfree(data_buf.data);
-
-  MemoryContextSwitchTo(old_ctx);
 }
 
 /* This is called when we're being unloaded from a process. Note that
@@ -231,7 +185,6 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
 void _PG_fini(void)
 {
   memcached_free(globals.mc);
-  MemoryContextDelete(globals.pg_ctxt);
 }
 
 Datum memcache_add(PG_FUNCTION_ARGS)
@@ -390,6 +343,7 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   ret = (text *) palloc(return_value_length + VARHDRSZ);
   SET_VARSIZE(ret, return_value_length + VARHDRSZ);
   memcpy(VARDATA(ret), string, return_value_length);
+  free(string);
 
   PG_RETURN_TEXT_P(ret);
 }
@@ -505,6 +459,7 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
       memcpy(values[0], fctx->keys[funcctx->call_cntr], fctx->key_lens[funcctx->call_cntr]);
       memcpy(values[1], value, value_length);
+      free(value);
 
       // BuildTupleFromCStrings needs correct zero-terminated C-string, so terminate our raw strings
       values[0][ fctx->key_lens[funcctx->call_cntr] ] = '\0';
@@ -688,15 +643,10 @@ static memcached_return do_server_add(const char *host_str)
 {
   memcached_server_st *servers;
   memcached_return rc;
-  MemoryContext old_ctx;
-
-  old_ctx = MemoryContextSwitchTo(globals.pg_ctxt);
 
   servers = memcached_servers_parse(host_str);
   rc = memcached_server_push(globals.mc, servers);
   memcached_server_list_free(servers);
-
-  MemoryContextSwitchTo(old_ctx);
 
   return rc;
 }
@@ -818,10 +768,10 @@ static memcached_return_t server_stat_function(memcached_st *ptr,
     {
       char *value = memcached_stat_get_value(ptr, &stat, *stat_ptr, &rc);
       appendStringInfo(context, "%s: %s\n", *stat_ptr, value);
-      libmc_stat_free(value);
+      free(value);
     }
 
-  pfree(list);
+  free(list);
   return MEMCACHED_SUCCESS;
 }
 
