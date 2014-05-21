@@ -5,14 +5,28 @@
  * Copyright (c) 2007-2008 Neil Conway <neilc@samurai.com>
  * Copyright (c) 2007 Open Technology Group, Inc. <http://www.otg-nc.com>
  * Copyright (c) 2008-2013 Hannu Valtonen <hannu.valtonen@ohmu.fi>
+ * Copyright (c) 2012-2014 Ohmu Ltd <opensource@ohmu.fi>
  *
  * See the file LICENSE for distribution terms.
  */
+
 #include "pgmemcache.h"
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
+
+/* Internal functions */
+static void assign_default_servers_guc(const char *newval, void *extra);
+static void assign_default_behavior_guc(const char *newval, void *extra);
+static memcached_behavior get_memcached_behavior_flag(const char *flag);
+static uint64_t get_memcached_behavior_data(const char *flag, const char *data);
+static uint64_t get_memcached_hash_type(const char *data);
+static uint64_t get_memcached_distribution_type(const char *data);
+static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS);
+static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
+static memcached_return do_server_add(const char *host_str);
+
 
 /* Per-backend global state. */
 static struct memcache_global_s
@@ -23,6 +37,7 @@ static struct memcache_global_s
   char *sasl_authentication_username;
   char *sasl_authentication_password;
 } globals;
+
 
 void _PG_init(void)
 {
@@ -110,6 +125,34 @@ void _PG_init(void)
 #endif
 }
 
+/* This is called when we're being unloaded from a process. Note that
+ * this only happens when we're being replaced by a LOAD (e.g. it
+ * doesn't happen on process exit), so we can't depend on it being
+ * called. */
+void _PG_fini(void)
+{
+  memcached_free(globals.mc);
+}
+
+static time_t interval_to_time_t(Interval *span)
+{
+  float8 result;
+
+#ifdef HAVE_INT64_TIMESTAMP
+  result = span->time / 1000000e0;
+#else
+  result = span->time;
+#endif
+
+  if (span->month != 0)
+    {
+      result += (365.25 * 86400) * (span->month / 12);
+      result += (30.0 * 86400) * (span->month % 12);
+    }
+
+  return (time_t) result;
+}
+
 static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
@@ -176,15 +219,6 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
     }
   pfree(flag_buf.data);
   pfree(data_buf.data);
-}
-
-/* This is called when we're being unloaded from a process. Note that
- * this only happens when we're being replaced by a LOAD (e.g. it
- * doesn't happen on process exit), so we can't depend on it being
- * called. */
-void _PG_fini(void)
-{
-  memcached_free(globals.mc);
 }
 
 Datum memcache_add(PG_FUNCTION_ARGS)
@@ -276,25 +310,6 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
                   memcached_strerror(globals.mc, rc));
 
   PG_RETURN_BOOL(rc == 0);
-}
-
-static time_t interval_to_time_t(Interval *span)
-{
-  float8 result;
-
-#ifdef HAVE_INT64_TIMESTAMP
-  result = span->time / 1000000e0;
-#else
-  result = span->time;
-#endif
-
-  if (span->month != 0)
-    {
-      result += (365.25 * 86400) * (span->month / 12);
-      result += (30.0 * 86400) * (span->month % 12);
-    }
-
-  return (time_t) result;
 }
 
 Datum memcache_flush_all0(PG_FUNCTION_ARGS)
@@ -398,9 +413,9 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       keys = palloc(sizeof(char *) * (array_length + 1 /* extra key for last memcached_fetch call */ ));
       key_lens = palloc(sizeof(size_t) * (array_length + 1));
 
-      // initialize terminating extra-key
-      keys[ array_length ] = 0;
-      key_lens[ array_length ] = 0;
+      /* initialize terminating extra-key */
+      keys[array_length] = 0;
+      key_lens[array_length] = 0;
 
       for (i = 0; i < array_length; i++)
         {
@@ -454,16 +469,17 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
           SRF_RETURN_DONE(funcctx);
         }
       values = (char **) palloc(2 * sizeof(char *));
-      values[0] = (char *) palloc((fctx->key_lens[funcctx->call_cntr] + /* additional space for terminating zero character */ 1) * sizeof(char));
-      values[1] = (char *) palloc((value_length + /* additional space for terminating zero character */ 1) * sizeof(char));
+      /* make sure we have space for terminating zero character */
+      values[0] = (char *) palloc(fctx->key_lens[funcctx->call_cntr] + 1);
+      values[1] = (char *) palloc(value_length + 1);
 
       memcpy(values[0], fctx->keys[funcctx->call_cntr], fctx->key_lens[funcctx->call_cntr]);
       memcpy(values[1], value, value_length);
       free(value);
 
-      // BuildTupleFromCStrings needs correct zero-terminated C-string, so terminate our raw strings
-      values[0][ fctx->key_lens[funcctx->call_cntr] ] = '\0';
-      values[1][ value_length ] = '\0';
+      /* BuildTupleFromCStrings needs correct zero-terminated C-string, so terminate our raw strings */
+      values[0][fctx->key_lens[funcctx->call_cntr]] = '\0';
+      values[1][value_length] = '\0';
 
       tuple = BuildTupleFromCStrings(attinmeta, values);
       result = HeapTupleGetDatum(tuple);
@@ -520,21 +536,20 @@ Datum memcache_append_absexpire(PG_FUNCTION_ARGS)
 
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 {
-  text *key = NULL, *val;
-  size_t key_length, val_length;
-  time_t expire;
-  TimestampTz timestamptz;
-  struct pg_tm tm;
-  fsec_t fsec;
-  bool ret;
+  memcached_return rc = MEMCACHED_FAILURE;
+  const char *func = NULL;
+  char *key, *value;
+  text *key_text = NULL, *value_text;
+  size_t key_length, value_length;
+  time_t expiration = 0;
 
   if (PG_ARGISNULL(0))
     elog(ERROR, "pgmemcache: key cannot be NULL");
   if (PG_ARGISNULL(1))
     elog(ERROR, "pgmemcache: value cannot be NULL");
 
-  key = PG_GETARG_TEXT_P(0);
-  key_length = VARSIZE(key) - VARHDRSZ;
+  key_text = PG_GETARG_TEXT_P(0);
+  key_length = VARSIZE(key_text) - VARHDRSZ;
 
   /* These aren't really needed as we set libmemcached behavior to check for all invalid sets */
   if (key_length < 1)
@@ -542,19 +557,22 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
   if (key_length >= 250)
     elog(ERROR, "pgmemcache: key too long");
 
-  val = PG_GETARG_TEXT_P(1);
-  val_length = VARSIZE(val) - VARHDRSZ;
+  value_text = PG_GETARG_TEXT_P(1);
+  value_length = VARSIZE(value_text) - VARHDRSZ;
 
-  expire = (time_t) 0.0;
   if (PG_NARGS() >= 3 && PG_ARGISNULL(2) == false)
     {
       if (type & PG_MEMCACHE_TYPE_INTERVAL)
         {
           Interval *span = PG_GETARG_INTERVAL_P(2);
-          expire = interval_to_time_t(span);
+          expiration = interval_to_time_t(span);
         }
       else if (type & PG_MEMCACHE_TYPE_TIMESTAMP)
         {
+          TimestampTz timestamptz;
+          struct pg_tm tm;
+          fsec_t fsec;
+
           timestamptz = PG_GETARG_TIMESTAMPTZ(2);
 
           /* convert to timestamptz to produce consistent results */
@@ -564,9 +582,9 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
                      errmsg("timestamp out of range")));
 
 #ifdef HAVE_INT64_TIMESTAMP
-          expire = (time_t) ((timestamptz - SetEpochTimestamp()) / 1000000e0);
+          expiration = (time_t) ((timestamptz - SetEpochTimestamp()) / 1000000e0);
 #else
-          expire = (time_t) timestamptz - SetEpochTimestamp();
+          expiration = (time_t) timestamptz - SetEpochTimestamp();
 #endif
         }
       else
@@ -575,16 +593,8 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
         }
     }
 
-  ret = do_memcache_set_cmd(type, VARDATA(key), key_length, VARDATA(val), val_length, expire);
-
-  PG_RETURN_BOOL(ret);
-}
-
-static bool do_memcache_set_cmd(int type, char *key, size_t key_length,
-                                char *value, size_t value_length, time_t expiration)
-{
-  memcached_return rc = 1; /*FIXME GCC Warning hack*/
-  const char *func = NULL;
+  key = VARDATA(key_text);
+  value = VARDATA(value_text);
 
   if (type & PG_MEMCACHE_ADD)
     {
@@ -620,13 +630,14 @@ static bool do_memcache_set_cmd(int type, char *key, size_t key_length,
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: %s: %s", func,
                   memcached_strerror(globals.mc, rc));
-  return rc == MEMCACHED_SUCCESS;
+
+  PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
 Datum memcache_server_add(PG_FUNCTION_ARGS)
 {
   text *server = PG_GETARG_TEXT_P(0);
-  char * host_str;
+  char *host_str;
   memcached_return rc;
 
   host_str = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(server)));
