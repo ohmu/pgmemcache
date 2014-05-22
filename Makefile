@@ -37,7 +37,7 @@ deb%:
 	dch -v $(long_ver) "Automatically built package"
 	sed -e s/PGVERSION/$(subst deb,,$@)/g < debian/control.in > debian/control
 	echo $(subst deb,,$@) > debian/pgversions
-	dpkg-buildpackage -uc -us
+	PGVERSION=$(subst deb,,$@) dpkg-buildpackage -uc -us
 
 rpm:
 	git archive --output=pgmemcache-rpm-src.tar.gz --prefix=pgmemcache/ HEAD

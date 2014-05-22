@@ -1,5 +1,5 @@
-pgmemcache 2.1
-==============
+pgmemcache
+==========
 
 pgmemcache is a set of PostgreSQL user-defined functions that provide an
 interface to memcached.  Installing pgmemcache is easy, but does have a few
@@ -16,8 +16,8 @@ Always prefer the latest versions.
 INSTALLATION:
 =============
 
-1a) Building from sources:
---------------------------
+Building from sources:
+----------------------
 
 1) Install PostgreSQL with PGXS (if not already installed)
 2) Install libmemcached
@@ -27,8 +27,8 @@ INSTALLATION:
 If necessary, update LD_LIBRARY_CACHE for the PostgreSQL server owner and restart PostgreSQL.
 Also make sure that the pg_config binary is in your PATH (or edit the Makefile).
 
-1 b) Building on Debian:
-------------------------
+Building on Debian:
+-------------------
 
 1) sudo make build-dep
 2) make deb9.2
