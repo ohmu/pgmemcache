@@ -1,6 +1,7 @@
 pgmemcache 2.1.3-DEV
 ====================
 
+* Support for MEMCACHED_BEHAVIOR_DEAD_TIMEOUT with libmemcached >= 1.0.3
 * Changing default_servers now drops old servers from the list
 * debian: new packaging to replace yada which is not available in
   Debian Wheezy anymore (Oskari Saarenmaa)
