@@ -25,7 +25,6 @@ static memcached_behavior get_memcached_behavior_flag(const char *flag);
 static uint64_t get_memcached_behavior_data(const char *flag, const char *data);
 static uint64_t get_memcached_hash_type(const char *data);
 static uint64_t get_memcached_distribution_type(const char *data);
-static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS);
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(const char *host_str);
 
@@ -255,13 +254,13 @@ Datum memcache_add_absexpire(PG_FUNCTION_ARGS)
   return memcache_set_cmd(PG_MEMCACHE_ADD | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
-static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
+static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
 {
   text *atomic_key = PG_GETARG_TEXT_P(0);
   char *key;
   size_t key_length;
   uint64_t val;
-  uint64_t offset = 1;
+  int64_t offset = 1;
   memcached_return rc;
 
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
@@ -274,10 +273,15 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
 
   if (PG_NARGS() >= 2)
     offset = PG_GETARG_INT64(1);
+
   if (offset < 0)
     {
-      /* Cannot represent negative BIGINT values with uint64_t */
-      elog(ERROR, "pgmemcache: offset cannot be negative");
+      /* memcached uses uint64_t but postgresql only has signed types, but
+       * since we have both increment and decrement operations let's just
+       * invert the operation if offset is negative.
+       */
+      offset = abs(offset);
+      increment = !increment;
     }
 
   if (increment)
@@ -305,7 +309,12 @@ static Datum memcache_atomic_op(bool increment, PG_FUNCTION_ARGS)
 
 Datum memcache_decr(PG_FUNCTION_ARGS)
 {
-  return memcache_atomic_op(false, fcinfo);
+  return memcache_delta_op(false, fcinfo);
+}
+
+Datum memcache_incr(PG_FUNCTION_ARGS)
+{
+  return memcache_delta_op(true, fcinfo);
 }
 
 Datum memcache_delete(PG_FUNCTION_ARGS)
@@ -511,11 +520,6 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       SRF_RETURN_NEXT(funcctx, result);
     }
   SRF_RETURN_DONE(funcctx);
-}
-
-Datum memcache_incr(PG_FUNCTION_ARGS)
-{
-  return memcache_atomic_op(true, fcinfo);
 }
 
 Datum memcache_replace(PG_FUNCTION_ARGS)
