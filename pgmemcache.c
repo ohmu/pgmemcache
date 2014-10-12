@@ -791,27 +791,33 @@ static uint64_t get_memcached_distribution_type(const char *value)
  * memcached_stat_get_keys wants a non-const argument so we don't define it
  * as const here.
  */
-static memcached_return_t server_stat_function(memcached_st *ptr,
+static memcached_return_t server_stat_function(memcached_st *mc,
                                                memcached_server_instance_st server,
                                                void *context)
 {
   char **list, **stat_ptr;
   memcached_return rc;
   memcached_stat_st stat;
+  StringInfoData *strbuf = (StringInfoData *) context;
+  const char *hostname = memcached_server_name(server);
+  unsigned int port = memcached_server_port(server);
 
-  rc = memcached_stat_servername(&stat, NULL, memcached_server_name(server),
-                                 memcached_server_port(server));
+  rc = memcached_stat_servername(&stat, NULL, hostname, port);
+  if (rc != MEMCACHED_SUCCESS)
+    return rc;
 
-  list = memcached_stat_get_keys(ptr, &stat, &rc);
+  list = memcached_stat_get_keys(mc, &stat, &rc);
+  if (rc != MEMCACHED_SUCCESS)
+    return rc;
 
-  appendStringInfo(context, "Server: %s (%u)\n", memcached_server_name(server),
-                   memcached_server_port(server));
-  for (stat_ptr = list; *stat_ptr; stat_ptr++)
+  appendStringInfo(strbuf, "Server: %s (%u)\n", hostname, port);
+  for (stat_ptr = list; stat_ptr && *stat_ptr; stat_ptr++)
     {
-      char *value = memcached_stat_get_value(ptr, &stat, *stat_ptr, &rc);
-      appendStringInfo(context, "%s: %s\n", *stat_ptr, value);
+      char *value = memcached_stat_get_value(mc, &stat, *stat_ptr, &rc);
+      appendStringInfo(strbuf, "%s: %s\n", *stat_ptr, value);
       free(value);
     }
+  appendStringInfo(strbuf, "\n");
 
   free(list);
   return MEMCACHED_SUCCESS;
@@ -819,18 +825,17 @@ static memcached_return_t server_stat_function(memcached_st *ptr,
 
 Datum memcache_stats(PG_FUNCTION_ARGS)
 {
-  StringInfoData buf;
+  StringInfoData strbuf;
   memcached_return rc;
   memcached_server_fn callbacks[1];
 
-  initStringInfo(&buf);
+  initStringInfo(&strbuf);
   callbacks[0] = (memcached_server_fn) server_stat_function;
-  appendStringInfo(&buf, "\n");
-  rc = memcached_server_cursor(globals.mc, callbacks, (void *) &buf, 1);
+  rc = memcached_server_cursor(globals.mc, callbacks, (void *) &strbuf, 1);
 
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_SOME_ERRORS)
     elog(WARNING, "pgmemcache: memcache_stats: %s",
                   memcached_strerror(globals.mc, rc));
 
-  PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(buf.data)));
+  PG_RETURN_DATUM(DirectFunctionCall1(textin, CStringGetDatum(strbuf.data)));
 }
