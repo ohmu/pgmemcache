@@ -1,6 +1,10 @@
 pgmemcache DEV
 ==============
 
+* Flush client buffers to memcache servers on commit if the new GUC
+  pgmemcache.flush_on_commit is enabled, otherwise some buffers may get
+  lost when the PostgreSQL backend terminates before everything has been
+  sent which is especially likely when the BUFFER_REQUESTS behavior is used
 * Return NULL when a set-related function returns MEMCACHED_BUFFERED to
   indicate that we don't really know the result of the action, but it wasn't
   an error
