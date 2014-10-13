@@ -1,3 +1,10 @@
+pgmemcache DEV
+==============
+
+* Return NULL when a set-related function returns MEMCACHED_BUFFERED to
+  indicate that we don't really know the result of the action, but it wasn't
+  an error
+
 pgmemcache 2.2.0
 ================
 

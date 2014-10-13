@@ -288,6 +288,8 @@ static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
     rc = memcached_increment_with_initial(globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
   else
     rc = memcached_decrement_with_initial(globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
+  if (rc == MEMCACHED_BUFFERED)
+    PG_RETURN_NULL();
 
   if (rc != MEMCACHED_SUCCESS)
     {
@@ -337,12 +339,13 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
     hold = interval_to_time_t(PG_GETARG_INTERVAL_P(1));
 
   rc = memcached_delete(globals.mc, key, key_length, hold);
-
+  if (rc == MEMCACHED_BUFFERED)
+    PG_RETURN_NULL();
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
     elog(WARNING, "pgmemcache: memcached_delete: %s",
                   memcached_strerror(globals.mc, rc));
 
-  PG_RETURN_BOOL(rc == 0);
+  PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
 Datum memcache_flush_all0(PG_FUNCTION_ARGS)
@@ -351,11 +354,13 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
   memcached_return rc;
 
   rc = memcached_flush(globals.mc, opt_expire);
+  if (rc == MEMCACHED_BUFFERED)
+    PG_RETURN_NULL();
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: memcached_flush: %s",
                   memcached_strerror(globals.mc, rc));
 
-  PG_RETURN_BOOL(rc == 0);
+  PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
 Datum memcache_get(PG_FUNCTION_ARGS)
@@ -655,6 +660,8 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
       return false;
     }
 
+  if (rc == MEMCACHED_BUFFERED)
+    PG_RETURN_NULL();
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: %s: %s", func,
                   memcached_strerror(globals.mc, rc));
