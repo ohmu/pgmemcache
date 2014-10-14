@@ -23,8 +23,6 @@ static void assign_default_servers_guc(const char *newval, void *extra);
 static void assign_default_behavior_guc(const char *newval, void *extra);
 static memcached_behavior get_memcached_behavior_flag(const char *flag);
 static uint64_t get_memcached_behavior_data(const char *flag, const char *data);
-static uint64_t get_memcached_hash_type(const char *data);
-static uint64_t get_memcached_distribution_type(const char *data);
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(const char *host_str);
 
@@ -690,6 +688,7 @@ static memcached_return do_server_add(const char *host_str)
   return rc;
 }
 
+#define MC_ENUM_INVAL -1
 #define MC_STR_TO_ENUM(d,v) \
   if (strcmp(value, "MEMCACHED_" #d "_" #v) == 0 || strcmp(value, #v) == 0) \
       return MEMCACHED_##d##_##v
@@ -734,10 +733,38 @@ static memcached_behavior get_memcached_behavior_flag(const char *value)
   MC_STR_TO_ENUM(BEHAVIOR, VERIFY_KEY);
 
   elog(ERROR, "pgmemcache: unknown behavior flag: %s", value);
-  return -1;
+  return MC_ENUM_INVAL;
 }
 
-static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
+static memcached_hash get_memcached_hash_type(const char *value)
+{
+  MC_STR_TO_ENUM(HASH, MURMUR);
+  MC_STR_TO_ENUM(HASH, MD5);
+  MC_STR_TO_ENUM(HASH, JENKINS);
+  MC_STR_TO_ENUM(HASH, HSIEH);
+  MC_STR_TO_ENUM(HASH, FNV1A_64);
+  MC_STR_TO_ENUM(HASH, FNV1A_32);
+  MC_STR_TO_ENUM(HASH, FNV1_64);
+  MC_STR_TO_ENUM(HASH, FNV1_32);
+  MC_STR_TO_ENUM(HASH, DEFAULT);
+  MC_STR_TO_ENUM(HASH, CRC);
+
+  elog(ERROR, "pgmemcache: invalid hash name: %s", value);
+  return MC_ENUM_INVAL;
+}
+
+static memcached_server_distribution get_memcached_distribution_type(const char *value)
+{
+  MC_STR_TO_ENUM(DISTRIBUTION, RANDOM);
+  MC_STR_TO_ENUM(DISTRIBUTION, MODULA);
+  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT_KETAMA);
+  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT);
+
+  elog(ERROR, "pgmemcache: invalid distribution name: %s", value);
+  return MC_ENUM_INVAL;
+}
+
+static uint64_t get_memcached_behavior_data(const char *flag, const char *data)
 {
   char *endptr;
   uint64_t ret;
@@ -753,37 +780,8 @@ static uint64_t get_memcached_behavior_data (const char *flag, const char *data)
       ret = strtol(data, &endptr, 10);
       if (endptr == data)
         elog(ERROR, "pgmemcache: invalid behavior param %s: %s", flag, data);
-      return ret;
     }
   return ret;
-}
-
-static uint64_t get_memcached_hash_type(const char *value)
-{
-  MC_STR_TO_ENUM(HASH, MURMUR);
-  MC_STR_TO_ENUM(HASH, MD5);
-  MC_STR_TO_ENUM(HASH, JENKINS);
-  MC_STR_TO_ENUM(HASH, HSIEH);
-  MC_STR_TO_ENUM(HASH, FNV1A_64);
-  MC_STR_TO_ENUM(HASH, FNV1A_32);
-  MC_STR_TO_ENUM(HASH, FNV1_64);
-  MC_STR_TO_ENUM(HASH, FNV1_32);
-  MC_STR_TO_ENUM(HASH, DEFAULT);
-  MC_STR_TO_ENUM(HASH, CRC);
-
-  elog(ERROR, "pgmemcache: invalid hash name: %s", value);
-  return 0xffffffff; /* to avoid warning */
-}
-
-static uint64_t get_memcached_distribution_type(const char *value)
-{
-  MC_STR_TO_ENUM(DISTRIBUTION, RANDOM);
-  MC_STR_TO_ENUM(DISTRIBUTION, MODULA);
-  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT_KETAMA);
-  MC_STR_TO_ENUM(DISTRIBUTION, CONSISTENT);
-
-  elog(ERROR, "pgmemcache: invalid distribution name: %s", value);
-  return 0xffffffff; /* to avoid warning */
 }
 
 /* NOTE: memcached_server_fn specifies that the first argument is const, but
