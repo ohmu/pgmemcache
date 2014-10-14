@@ -691,8 +691,7 @@ static memcached_return do_server_add(const char *host_str)
 }
 
 #define MC_STR_TO_ENUM(d,v) \
-  if (strncmp(value, "MEMCACHED_" #d "_" #v, 9 + sizeof(#d) + sizeof(#v)) == 0 || \
-      strncmp(value, #v, sizeof(#v) - 1) == 0) \
+  if (strcmp(value, "MEMCACHED_" #d "_" #v) == 0 || strcmp(value, #v) == 0) \
       return MEMCACHED_##d##_##v
 
 static memcached_behavior get_memcached_behavior_flag(const char *value)
