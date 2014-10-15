@@ -18,6 +18,7 @@
 #include <inttypes.h>
 #include "access/heapam.h"
 #include "access/htup.h"
+#include "access/xact.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "lib/stringinfo.h"

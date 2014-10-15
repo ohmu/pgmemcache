@@ -18,6 +18,7 @@ PG_MODULE_MAGIC;
 
 /* Internal functions */
 static void pgmemcache_reset_context(void);
+static void pgmemcache_xact_callback(XactEvent event, void *arg);
 static void assign_sasl_params(const char *username, const char *password);
 static void assign_default_servers_guc(const char *newval, void *extra);
 static void assign_default_behavior_guc(const char *newval, void *extra);
@@ -30,6 +31,8 @@ static memcached_return do_server_add(const char *host_str);
 static struct memcache_global_s
 {
   memcached_st *mc;
+  bool flush_needed;
+  bool flush_on_commit;
   char *default_servers;
   char *default_behavior;
   char *sasl_authentication_username;
@@ -67,6 +70,19 @@ void _PG_init(void)
                              assign_default_behavior_guc,
                              NULL);
 
+  DefineCustomBoolVariable("pgmemcache.flush_on_commit",
+                           "Whether to flush all buffers to memcached on end of commit",
+                           NULL,
+                           &globals.flush_on_commit,
+                           false,
+                           PGC_USERSET,
+                           0,
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90100)
+                           NULL,
+#endif
+                           NULL,
+                           NULL);
+
   DefineCustomStringVariable("pgmemcache.sasl_authentication_username",
                              "pgmemcache SASL user authentication username",
                              "Simple string pgmemcache.sasl_authentication_username = 'testing_username'",
@@ -96,6 +112,8 @@ void _PG_init(void)
   /* XXX: We should have real assign_hook for these so that memcache sasl data
    * is updated when the values are changed.  */
   assign_sasl_params(globals.sasl_authentication_username, globals.sasl_authentication_password);
+
+  RegisterXactCallback(pgmemcache_xact_callback, NULL);
 }
 
 /* This is called when we're being unloaded from a process. Note that
@@ -126,6 +144,20 @@ static time_t interval_to_time_t(Interval *span)
     }
 
   return (time_t) result;
+}
+
+/* called at end of transaction, flush all buffers to memcache */
+static void pgmemcache_xact_callback(XactEvent event, void *arg)
+{
+  if (event == XACT_EVENT_COMMIT &&
+      globals.flush_on_commit && globals.flush_needed)
+    {
+      memcached_return rc = memcached_flush_buffers(globals.mc);
+      if (rc != MEMCACHED_SUCCESS)
+        elog(WARNING, "pgmemcache: memcached_flush_buffers: %s",
+                      memcached_strerror(globals.mc, rc));
+      globals.flush_needed = false;
+    }
 }
 
 static void pgmemcache_reset_context(void)
@@ -287,6 +319,11 @@ static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
   else
     rc = memcached_decrement_with_initial(globals.mc, key, key_length, offset, 0, MEMCACHED_EXPIRATION_NOT_ADD, &val);
 
+  if (rc == MEMCACHED_BUFFERED)
+    {
+      globals.flush_needed = true;
+      PG_RETURN_NULL();
+    }
   if (rc != MEMCACHED_SUCCESS)
     {
       elog(WARNING, "pgmemcache: memcached_%s_with_initial: %s",
@@ -335,12 +372,16 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
     hold = interval_to_time_t(PG_GETARG_INTERVAL_P(1));
 
   rc = memcached_delete(globals.mc, key, key_length, hold);
-
+  if (rc == MEMCACHED_BUFFERED)
+    {
+      globals.flush_needed = true;
+      PG_RETURN_NULL();
+    }
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
     elog(WARNING, "pgmemcache: memcached_delete: %s",
                   memcached_strerror(globals.mc, rc));
 
-  PG_RETURN_BOOL(rc == 0);
+  PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
 Datum memcache_flush_all0(PG_FUNCTION_ARGS)
@@ -349,11 +390,16 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
   memcached_return rc;
 
   rc = memcached_flush(globals.mc, opt_expire);
+  if (rc == MEMCACHED_BUFFERED)
+    {
+      globals.flush_needed = true;
+      PG_RETURN_NULL();
+    }
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: memcached_flush: %s",
                   memcached_strerror(globals.mc, rc));
 
-  PG_RETURN_BOOL(rc == 0);
+  PG_RETURN_BOOL(rc == MEMCACHED_SUCCESS);
 }
 
 Datum memcache_get(PG_FUNCTION_ARGS)
@@ -653,6 +699,11 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
       return false;
     }
 
+  if (rc == MEMCACHED_BUFFERED)
+    {
+      globals.flush_needed = true;
+      PG_RETURN_NULL();
+    }
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: %s: %s", func,
                   memcached_strerror(globals.mc, rc));
