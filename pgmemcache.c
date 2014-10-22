@@ -415,7 +415,8 @@ Datum memcache_get(PG_FUNCTION_ARGS)
 
   get_key = PG_GETARG_TEXT_P(0);
 
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
+  //key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
+  key = VARDATA(get_key);
   key_length = strlen(key);
 
   if (key_length < 1)
