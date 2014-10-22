@@ -293,8 +293,8 @@ static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
   int64_t offset = 1;
   memcached_return rc;
 
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
-  key_length = strlen(key);
+  key = VARDATA(atomic_key);
+  key_length = VARSIZE(atomic_key) - VARHDRSZ;
 
   if (key_length < 1)
     elog(ERROR, "pgmemcache: key cannot be an empty string");
@@ -360,8 +360,10 @@ Datum memcache_delete(PG_FUNCTION_ARGS)
   memcached_return rc;
   char *key;
 
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(key_to_be_deleted)));
-  key_length = strlen(key);
+  key = VARDATA(key_to_be_deleted);
+  key_length = VARSIZE(key_to_be_deleted) - VARHDRSZ;
+
+  
   if (key_length < 1)
     elog(ERROR, "pgmemcache: key cannot be an empty string");
   if (key_length >= 250)
@@ -415,8 +417,8 @@ Datum memcache_get(PG_FUNCTION_ARGS)
 
   get_key = PG_GETARG_TEXT_P(0);
 
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
-  key_length = strlen(key);
+  key = VARDATA(get_key);
+  key_length = VARSIZE(get_key) - VARHDRSZ;
 
   if (key_length < 1)
     elog(ERROR, "pgmemcache: key cannot be an empty string");
@@ -717,7 +719,7 @@ Datum memcache_server_add(PG_FUNCTION_ARGS)
   char *host_str;
   memcached_return rc;
 
-  host_str = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(server)));
+  host_str = VARDATA(server);
 
   rc = do_server_add(host_str);
   if (rc != MEMCACHED_SUCCESS)
