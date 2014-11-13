@@ -50,3 +50,16 @@ rpm:
 
 build-dep:
 	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison libsasl2-dev
+
+check-coverity:
+	$(MAKE) clean
+	$(RM) -r cov-int pgmemcache-cov-int.tar.gz
+	cov-build --dir cov-int $(MAKE)
+	tar zcvf pgmemcache-cov-int.tar.gz cov-int
+	curl --verbose --form 'token=<.coverity-token' \
+		--form 'email=<.coverity-email' \
+		--form 'file=@pgmemcache-cov-int.tar.gz' \
+		--form 'version=$(long_ver)' \
+		--form 'description=$(short_ver)' \
+		'https://scan.coverity.com/builds?project=ohmu%2Fpgmemcache'
+	$(RM) -r cov-int pgmemcache-cov-int.tar.gz
