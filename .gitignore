@@ -1,3 +1,5 @@
+.coverity-email
+.coverity-token
 *~
 *.o
 *.so
