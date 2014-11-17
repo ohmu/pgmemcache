@@ -10,6 +10,15 @@
  * See the file LICENSE for distribution terms.
  */
 
+#ifdef USE_OMCACHE
+#define OMCACHE_READ_TIMEOUT 2000
+#include "omcache_libmemcached.h"
+#include <syslog.h>  /* for log levels */
+#endif /* USE_OMCACHE */
+#ifdef USE_LIBMEMCACHED
+#include <libmemcached/memcached.h>
+#endif /* USE_LIBMEMCACHED */
+
 #include "pgmemcache.h"
 
 #ifdef PG_MODULE_MAGIC
@@ -23,7 +32,7 @@ static void assign_sasl_params(const char *username, const char *password);
 static void assign_default_servers_guc(const char *newval, void *extra);
 static void assign_default_behavior_guc(const char *newval, void *extra);
 static memcached_behavior get_memcached_behavior_flag(const char *flag);
-static uint64_t get_memcached_behavior_data(const char *flag, const char *data);
+static uint64_t get_memcached_behavior_data(const char *flag, const char *data, const char **val);
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(const char *host_str);
 
@@ -149,21 +158,39 @@ static time_t interval_to_time_t(Interval *span)
 /* called at end of transaction, flush all buffers to memcache */
 static void pgmemcache_xact_callback(XactEvent event, void *arg)
 {
-  if (event == XACT_EVENT_COMMIT &&
+  if ((event == XACT_EVENT_COMMIT || event == XACT_EVENT_PRE_COMMIT) &&
       globals.flush_on_commit && globals.flush_needed)
     {
+#ifdef USE_LIBMEMCACHED
       memcached_return rc = memcached_flush_buffers(globals.mc);
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+      int rc = omcache_io(globals.mc, NULL, NULL, NULL, NULL, OMCACHE_READ_TIMEOUT);
+#endif /* USE_OMCACHE */
       if (rc != MEMCACHED_SUCCESS)
         elog(WARNING, "pgmemcache: memcached_flush_buffers: %s",
                       memcached_strerror(globals.mc, rc));
-      globals.flush_needed = false;
+      else
+        globals.flush_needed = false;
     }
 }
 
+#ifdef USE_OMCACHE
+static void pgmemcache_log_func(void *context, int syslog_level, const char *msg)
+{
+  int pg_level = LOG_INFO;
+  switch (syslog_level)
+    {
+    case LOG_ERR:
+    case LOG_WARNING: pg_level = WARNING; break;
+    case LOG_NOTICE: pg_level = NOTICE; break;
+    }
+  elog(pg_level, "%s", msg);
+}
+#endif /* USE_OMCACHE */
+
 static void pgmemcache_reset_context(void)
 {
-  int rc;
-
   if (globals.mc)
     {
       memcached_free(globals.mc);
@@ -172,14 +199,22 @@ static void pgmemcache_reset_context(void)
 
   globals.mc = memcached_create(NULL);
 
+#ifdef USE_OMCACHE
+  omcache_set_log_callback(globals.mc, 0, pgmemcache_log_func, NULL);
+#endif /* USE_OMCACHE */
+
+#ifdef USE_LIBMEMCACHED
   /* Always use the memcache binary protocol as required for
      memcached_(increment|decrement)_with_initial. */
-  rc = memcached_behavior_set(globals.mc,
-                              MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
-                              1);
-  if (rc != MEMCACHED_SUCCESS)
-    elog(WARNING, "pgmemcache: memcached_behavior_set(BINARY_PROTOCOL): %s",
-                  memcached_strerror(globals.mc, rc));
+  {
+    int rc = memcached_behavior_set(globals.mc,
+                                    MEMCACHED_BEHAVIOR_BINARY_PROTOCOL,
+                                    1);
+    if (rc != MEMCACHED_SUCCESS)
+      elog(WARNING, "pgmemcache: memcached_behavior_set(BINARY_PROTOCOL, 1): %s",
+                    memcached_strerror(globals.mc, rc));
+  }
+#endif /* USE_LIBMEMCACHED */
 
   assign_default_behavior_guc(globals.default_behavior, NULL);
   assign_sasl_params(globals.sasl_authentication_username, globals.sasl_authentication_password);
@@ -205,9 +240,11 @@ static void assign_default_servers_guc(const char *newval, void *extra)
 {
   if (newval)
     {
+#ifdef USE_LIBMEMCACHED
       /* there is no way to remove servers from a memcache context, so
        * recreate it from scratch when the server list changes */
       pgmemcache_reset_context();
+#endif /* USE_LIBMEMCACHED */
       do_server_add(newval);
     }
 }
@@ -218,6 +255,10 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
   StringInfoData flag_buf;
   StringInfoData data_buf;
   memcached_return rc;
+  memcached_behavior bkey;
+  uint64_t bval;
+  const char *bvalstr = "";
+
   if (!newval)
     return;
 
@@ -250,11 +291,72 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
 
               i += data_buf.len;
             }
-          rc = memcached_behavior_set(globals.mc,
-                                      get_memcached_behavior_flag(
-                                        flag_buf.data),
-                                      get_memcached_behavior_data(
-                                        flag_buf.data, data_buf.data));
+          rc = MEMCACHED_FAILURE;
+          bkey = get_memcached_behavior_flag(flag_buf.data);
+          bval = get_memcached_behavior_data(flag_buf.data, data_buf.data, &bvalstr);
+#ifdef USE_OMCACHE
+          if (bkey == NULL)
+            rc = OMCACHE_FAIL;
+          else if (strcmp(bkey, "BINARY_PROTOCOL") == 0)
+            {
+              if (!bval)
+                elog(ERROR, "pgmemcache: omcache always uses binary protocol");
+              rc = OMCACHE_OK;
+            }
+          else if (strcmp(bkey, "BUFFER_REQUESTS") == 0)
+            rc = omcache_set_buffering(globals.mc, bval);
+          else if (strcmp(bkey, "CONNECT_TIMEOUT") == 0)
+            rc = omcache_set_connect_timeout(globals.mc, bval);
+          else if (strcmp(bkey, "DEAD_TIMEOUT") == 0)
+            rc = omcache_set_dead_timeout(globals.mc, bval * 1000);
+          else if (strcmp(bkey, "DISTRIBUTION") == 0)
+            {
+              if (strcmp(bvalstr, "CONSISTENT") && strcmp(bvalstr, "CONSISTENT_KETAMA"))
+                elog(ERROR, "pgmemcache: omcache always uses ketama");
+              rc = OMCACHE_OK;
+            }
+          else if (strcmp(bkey, "HASH") == 0 || strcmp(bkey, "KETAMA_HASH") == 0)
+            {
+              if (strcmp(bvalstr, "DEFAULT"))
+                elog(ERROR, "pgmemcache: omcache always uses the 'default' (bob jenkins' 'one at a time') hash");
+              rc = OMCACHE_OK;
+            }
+          else if (strcmp(bkey, "KETAMA") == 0)
+            {
+              if (!bval)
+                elog(ERROR, "pgmemcache: omcache always uses a ketama distribution method");
+              rc = omcache_set_distribution_method(globals.mc, &omcache_dist_libmemcached_ketama);
+            }
+          else if (strcmp(bkey, "KETAMA_WEIGHTED") == 0)
+            {
+              if (!bval)
+                elog(ERROR, "pgmemcache: omcache always uses a ketama distribution method");
+              rc = omcache_set_distribution_method(globals.mc, &omcache_dist_libmemcached_ketama_weighted);
+            }
+          else if (strcmp(bkey, "KETAMA_PRE1010") == 0)
+            {
+              if (!bval)
+                elog(ERROR, "pgmemcache: omcache always uses a ketama distribution method");
+              rc = omcache_set_distribution_method(globals.mc, &omcache_dist_libmemcached_ketama_pre1010);
+            }
+          else if (strcmp(bkey, "NO_BLOCK") == 0)
+            rc = OMCACHE_OK;  // omcache is non-blocking by default
+          else if (strcmp(bkey, "NOREPLY") == 0)
+            rc = OMCACHE_OK;  // this isn't really a behavior in omcache
+          else if (strcmp(bkey, "REMOVE_FAILED_SERVERS") == 0)
+            rc = OMCACHE_OK;  // omcache doesn't have this concept
+          else if (strcmp(bkey, "RETRY_TIMEOUT") == 0)
+            rc = omcache_set_reconnect_timeout(globals.mc, bval * 1000);
+          else if (strcmp(bkey, "SUPPORT_CAS") == 0)
+            rc = OMCACHE_OK;  // omcache uses binary protocol which always has cas
+          else
+            {
+              elog(ERROR, "pgmemcache: unsupported behavior %s for omcache", flag_buf.data);
+            }
+#endif /* USE_OMCACHE */
+#ifdef USE_LIBMEMCACHED
+          rc = memcached_behavior_set(globals.mc, bkey, bval);
+#endif /* USE_LIBMEMCACHED */
           if (rc != MEMCACHED_SUCCESS)
             elog(WARNING, "pgmemcache: memcached_behavior_set: %s",
                           memcached_strerror(globals.mc, rc));
@@ -405,9 +507,15 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
 Datum memcache_get(PG_FUNCTION_ARGS)
 {
   text *get_key, *ret;
-  char *string, *key;
-  size_t key_length, return_value_length;
+  char *key;
+#ifdef USE_LIBMEMCACHED
+  char *string;
   uint32_t flags;
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+  const unsigned char *string;
+#endif /* USE_OMCACHE */
+  size_t key_length, return_value_length;
   memcached_return rc;
 
   if (PG_ARGISNULL(0))
@@ -423,7 +531,13 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   if (key_length >= 250)
     elog(ERROR, "pgmemcache: key too long");
 
+#ifdef USE_LIBMEMCACHED
   string = memcached_get(globals.mc, key, key_length, &return_value_length, &flags, &rc);
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+  rc = omcache_get(globals.mc, omc_cc_to_cuc(key), key_length, &string, &return_value_length,
+                   NULL, NULL, OMCACHE_READ_TIMEOUT);
+#endif /* USE_OMCACHE */
 
   if (rc != MEMCACHED_SUCCESS && rc != MEMCACHED_NOTFOUND)
     elog(ERROR, "pgmemcache: memcached_get: %s",
@@ -435,7 +549,9 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   ret = (text *) palloc(return_value_length + VARHDRSZ);
   SET_VARSIZE(ret, return_value_length + VARHDRSZ);
   memcpy(VARDATA(ret), string, return_value_length);
+#ifdef USE_LIBMEMCACHED
   free(string);
+#endif /* USE_LIBMEMCACHED */
 
   PG_RETURN_TEXT_P(ret);
 }
@@ -445,13 +561,20 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   ArrayType *array;
   int array_length, array_lbound, i;
   Oid element_type;
+#ifdef USE_LIBMEMCACHED
   uint32_t flags;
+#endif /* USE_LIBMEMCACHED */
   memcached_return rc;
   char typalign;
   int16 typlen;
   bool typbyval;
-  char **keys, *value;
-  size_t *key_lens, value_length;
+#ifdef USE_OMCACHE
+  const unsigned
+#endif /* USE_OMCACHE */
+  char *current_key, *current_val;
+  size_t current_key_len, current_val_len;
+  char **keys;
+  size_t *key_lens;
   FuncCallContext *funcctx;
   MemoryContext oldcontext;
   TupleDesc tupdesc;
@@ -459,6 +582,12 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   struct internal_fctx {
       char **keys;
       size_t *key_lens;
+#ifdef USE_OMCACHE
+      omcache_req_t *requests;
+      size_t request_count;
+      omcache_value_t *values;
+      size_t value_count;
+#endif /* USE_OMCACHE */
   } *fctx;
 
   if (PG_ARGISNULL(0))
@@ -494,6 +623,14 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       keys[array_length] = 0;
       key_lens[array_length] = 0;
 
+#ifdef USE_OMCACHE
+      /* persistent request structures to handle pending requests */
+      fctx->requests = palloc(sizeof(omcache_req_t) * array_length);
+      fctx->request_count = array_length;
+      fctx->values = palloc(sizeof(omcache_value_t) * array_length);
+      fctx->value_count = array_length;
+#endif /* USE_OMCACHE */
+
       for (i = 0; i < array_length; i++)
         {
           int offset = array_lbound + i;
@@ -510,10 +647,19 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       fctx->keys = keys;
       fctx->key_lens = key_lens;
 
+#ifdef USE_LIBMEMCACHED
       rc = memcached_mget(globals.mc, (const char **) keys, key_lens, array_length);
       if (rc != MEMCACHED_SUCCESS)
         elog(ERROR, "pgmemcache: memcached_mget: %s",
                     memcached_strerror(globals.mc, rc));
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+      rc = omcache_get_multi(globals.mc, (const unsigned char **) keys, key_lens, array_length,
+                             fctx->requests, &fctx->request_count, fctx->values, &fctx->value_count,
+                             OMCACHE_READ_TIMEOUT);
+      if (rc != OMCACHE_OK && rc != OMCACHE_AGAIN)
+        elog(ERROR, "pgmemcache: omcache_get_multi: %s", omcache_strerror(rc));
+#endif /* USE_OMCACHE */
 
       if (rc == MEMCACHED_NOTFOUND)
         PG_RETURN_NULL();
@@ -528,35 +674,60 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   fctx = funcctx->user_fctx;
   attinmeta = funcctx->attinmeta;
 
-  value = memcached_fetch(globals.mc, fctx->keys[funcctx->call_cntr], &fctx->key_lens[funcctx->call_cntr], &value_length, &flags, &rc);
-  if (value != NULL)
+#ifdef USE_LIBMEMCACHED
+  current_key = fctx->keys[funcctx->call_cntr];
+  current_key_len = fctx->key_lens[funcctx->call_cntr];
+  current_val = memcached_fetch(globals.mc, current_key, &current_key_len, &current_val_len, &flags, &rc);
+  if (rc == MEMCACHED_END)
+    {
+      SRF_RETURN_DONE(funcctx);
+    }
+  else if (rc != MEMCACHED_SUCCESS)
+    {
+      elog(ERROR, "pgmemcache: memcached_fetch: %s",
+                  memcached_strerror(globals.mc, rc));
+      SRF_RETURN_DONE(funcctx);
+    }
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+  current_val = NULL;
+  if (fctx->value_count == 0 && fctx->request_count > 0)
+    {
+      fctx->value_count = fctx->request_count;
+      rc = omcache_io(globals.mc, fctx->requests, &fctx->request_count,
+                      fctx->values, &fctx->value_count, OMCACHE_READ_TIMEOUT);
+      if (rc != OMCACHE_OK && rc != OMCACHE_AGAIN)
+        elog(ERROR, "pgmemcache: omcache_io: %s", omcache_strerror(rc));
+    }
+  if (fctx->value_count > 0)
+    {
+      fctx->value_count --;
+      current_key = fctx->values[fctx->value_count].key;
+      current_key_len = fctx->values[fctx->value_count].key_len;
+      current_val = fctx->values[fctx->value_count].data;
+      current_val_len = fctx->values[fctx->value_count].data_len;
+    }
+#endif /* USE_OMCACHE */
+  if (current_val != NULL)
     {
       char **values;
       HeapTuple tuple;
       Datum result;
 
-      if (rc == MEMCACHED_END)
-        {
-          SRF_RETURN_DONE(funcctx);
-        }
-      else if (rc != MEMCACHED_SUCCESS)
-        {
-          elog(ERROR, "pgmemcache: memcached_fetch: %s",
-                      memcached_strerror(globals.mc, rc));
-          SRF_RETURN_DONE(funcctx);
-        }
       values = (char **) palloc(2 * sizeof(char *));
       /* make sure we have space for terminating zero character */
-      values[0] = (char *) palloc(fctx->key_lens[funcctx->call_cntr] + 1);
-      values[1] = (char *) palloc(value_length + 1);
+      values[0] = (char *) palloc(current_key_len + 1);
+      values[1] = (char *) palloc(current_val_len + 1);
 
-      memcpy(values[0], fctx->keys[funcctx->call_cntr], fctx->key_lens[funcctx->call_cntr]);
-      memcpy(values[1], value, value_length);
-      free(value);
+      memcpy(values[0], current_key, current_key_len);
+      memcpy(values[1], current_val, current_val_len);
+#ifdef USE_LIBMEMCACHED
+      free(current_val);
+#endif /* USE_LIBMEMCACHED */
 
       /* BuildTupleFromCStrings needs correct zero-terminated C-string, so terminate our raw strings */
-      values[0][fctx->key_lens[funcctx->call_cntr]] = '\0';
-      values[1][value_length] = '\0';
+      values[0][current_key_len] = '\0';
+      values[1][current_val_len] = '\0';
 
       tuple = BuildTupleFromCStrings(attinmeta, values);
       result = HeapTupleGetDatum(tuple);
@@ -739,10 +910,18 @@ static memcached_return do_server_add(const char *host_str)
   return rc;
 }
 
+#ifdef USE_LIBMEMCACHED
 #define MC_ENUM_INVAL -1
 #define MC_STR_TO_ENUM(d,v) \
   if (strcmp(value, "MEMCACHED_" #d "_" #v) == 0 || strcmp(value, #v) == 0) \
       return MEMCACHED_##d##_##v
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+#define MC_ENUM_INVAL NULL
+#define MC_STR_TO_ENUM(d,v) \
+  if (strcmp(value, "MEMCACHED_" #d "_" #v) == 0 || strcmp(value, #v) == 0) \
+      return #v
+#endif /* USE_OMCACHE */
 
 static memcached_behavior get_memcached_behavior_flag(const char *value)
 {
@@ -761,6 +940,9 @@ static memcached_behavior get_memcached_behavior_flag(const char *value)
   MC_STR_TO_ENUM(BEHAVIOR, IO_MSG_WATERMARK);
   MC_STR_TO_ENUM(BEHAVIOR, KETAMA);
   MC_STR_TO_ENUM(BEHAVIOR, KETAMA_HASH);
+#ifdef USE_OMCACHE
+  MC_STR_TO_ENUM(BEHAVIOR, KETAMA_PRE1010);
+#endif
   MC_STR_TO_ENUM(BEHAVIOR, KETAMA_WEIGHTED);
   MC_STR_TO_ENUM(BEHAVIOR, NO_BLOCK);
   MC_STR_TO_ENUM(BEHAVIOR, NOREPLY);
@@ -815,12 +997,14 @@ static memcached_server_distribution get_memcached_distribution_type(const char 
   return MC_ENUM_INVAL;
 }
 
-static uint64_t get_memcached_behavior_data(const char *flag, const char *data)
+static uint64_t get_memcached_behavior_data(const char *flag, const char *data, const char **val)
 {
   char *endptr;
   uint64_t ret;
+  memcached_behavior bkey = get_memcached_behavior_flag(flag);
 
-  switch (get_memcached_behavior_flag(flag))
+#ifdef USE_LIBMEMCACHED
+  switch (bkey)
     {
     case MEMCACHED_BEHAVIOR_HASH:
     case MEMCACHED_BEHAVIOR_KETAMA_HASH:
@@ -828,6 +1012,16 @@ static uint64_t get_memcached_behavior_data(const char *flag, const char *data)
     case MEMCACHED_BEHAVIOR_DISTRIBUTION:
       return get_memcached_distribution_type(data);
     default:
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+  ret = 0;
+  if (strcmp(bkey, "HASH") == 0 || strcmp(bkey, "KETAMA_HASH") == 0)
+    *val = get_memcached_hash_type(data);
+  else if (strcmp(bkey, "DISTRIBUTION") == 0)
+    *val = get_memcached_distribution_type(data);
+  else
+    {
+#endif /* USE_OMCACHE */
       ret = strtol(data, &endptr, 10);
       if (endptr == data)
         elog(ERROR, "pgmemcache: invalid behavior param %s: %s", flag, data);
@@ -843,12 +1037,17 @@ static memcached_return_t server_stat_function(memcached_st *mc,
                                                memcached_server_instance_st server,
                                                void *context)
 {
-  char **list, **stat_ptr;
   memcached_return rc;
-  memcached_stat_st stat;
   StringInfoData *strbuf = (StringInfoData *) context;
   const char *hostname = memcached_server_name(server);
   unsigned int port = memcached_server_port(server);
+
+  appendStringInfo(strbuf, "Server: %s (%u)\n", hostname, port);
+
+  {
+#ifdef USE_LIBMEMCACHED
+  memcached_stat_st stat;
+  char **list, **stat_ptr;
 
   rc = memcached_stat_servername(&stat, NULL, hostname, port);
   if (rc != MEMCACHED_SUCCESS)
@@ -858,16 +1057,40 @@ static memcached_return_t server_stat_function(memcached_st *mc,
   if (rc != MEMCACHED_SUCCESS)
     return rc;
 
-  appendStringInfo(strbuf, "Server: %s (%u)\n", hostname, port);
   for (stat_ptr = list; stat_ptr && *stat_ptr; stat_ptr++)
     {
       char *value = memcached_stat_get_value(mc, &stat, *stat_ptr, &rc);
       appendStringInfo(strbuf, "%s: %s\n", *stat_ptr, value);
       free(value);
     }
-  appendStringInfo(strbuf, "\n");
-
   free(list);
+#endif /* USE_LIBMEMCACHED */
+
+#ifdef USE_OMCACHE
+  size_t i, value_count = 50;
+  omcache_value_t values[50];
+  rc = omcache_stat(globals.mc, NULL, values, &value_count,
+                    server->server_index, OMCACHE_READ_TIMEOUT);
+  if (rc != OMCACHE_OK)
+    {
+      value_count = 0;
+      appendStringInfo(strbuf, "omcache_stat failed: %s\n", omcache_strerror(rc));
+    }
+
+  for (i = 0; i < value_count; i++)
+    {
+      int key_len = (int) values[i].key_len,
+          data_len = (int) values[i].data_len;
+      if (key_len == 0 && data_len == 0)
+        break;
+      appendStringInfo(strbuf, "%.*s: %.*s\n",
+                       key_len, (const char *) values[i].key,
+                       data_len, (const char *) values[i].data);
+    }
+#endif /* USE_OMCACHE */
+  }
+
+  appendStringInfo(strbuf, "\n");
   return MEMCACHED_SUCCESS;
 }
 
