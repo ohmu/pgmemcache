@@ -13,7 +13,6 @@
 #ifndef PGMEMCACHE_H
 #define PGMEMCACHE_H
 
-#include <libmemcached/memcached.h>
 #include "postgres.h"
 #include <inttypes.h>
 #include "access/heapam.h"

@@ -13,7 +13,13 @@ DATA =	ext/pgmemcache--unpackaged--2.0.sql \
 	ext/pgmemcache--2.1.2--2.2.0.sql
 REGRESS = init start_memcached test stop_memcached
 
+ifeq ($(USE_OMCACHE),1)
+SHLIB_LINK = -lomcache
+PG_CPPFLAGS += -DUSE_OMCACHE
+else
 SHLIB_LINK = -lmemcached -lsasl2
+PG_CPPFLAGS += -DUSE_LIBMEMCACHED
+endif
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
