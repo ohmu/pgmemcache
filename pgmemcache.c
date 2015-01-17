@@ -378,12 +378,12 @@ static void assign_default_behavior_guc(const char *newval, void *extra)
 
 Datum memcache_add(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_ADD | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_ADD | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
 
 Datum memcache_add_absexpire(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_ADD | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_ADD | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
 static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
@@ -739,42 +739,42 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
 
 Datum memcache_replace(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_REPLACE | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_REPLACE | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
 
 Datum memcache_replace_absexpire(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_REPLACE | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_REPLACE | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
 Datum memcache_set(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_SET | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_SET | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
 
 Datum memcache_set_absexpire(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_SET | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_SET | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
 Datum memcache_prepend(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_PREPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_PREPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
 
 Datum memcache_prepend_absexpire(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_PREPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_PREPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
 Datum memcache_append(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_APPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_APPEND | PG_MEMCACHE_TYPE_INTERVAL, fcinfo);
 }
 
 Datum memcache_append_absexpire(PG_FUNCTION_ARGS)
 {
-  return memcache_set_cmd(PG_MEMCACHE_APPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
+  return memcache_set_cmd(PG_MEMCACHE_CMD_APPEND | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
@@ -839,35 +839,30 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
   key = VARDATA(key_text);
   value = VARDATA(value_text);
 
-  if (type & PG_MEMCACHE_ADD)
+  switch (type & PG_MEMCACHE_CMD_MASK)
     {
+    case PG_MEMCACHE_CMD_ADD:
       func = "memcached_add";
       rc = memcached_add(globals.mc, key, key_length, value, value_length, expiration, 0);
-    }
-  else if (type & PG_MEMCACHE_REPLACE)
-    {
+      break;
+    case PG_MEMCACHE_CMD_REPLACE:
       func = "memcached_replace";
       rc = memcached_replace(globals.mc, key, key_length, value, value_length, expiration, 0);
-    }
-  else if (type & PG_MEMCACHE_SET)
-    {
+      break;
+    case PG_MEMCACHE_CMD_SET:
       func = "memcached_set";
       rc = memcached_set(globals.mc, key, key_length, value, value_length, expiration, 0);
-    }
-  else if (type & PG_MEMCACHE_PREPEND)
-    {
+      break;
+    case PG_MEMCACHE_CMD_PREPEND:
       func = "memcached_prepend";
       rc = memcached_prepend(globals.mc, key, key_length, value, value_length, expiration, 0);
-    }
-  else if (type & PG_MEMCACHE_APPEND)
-    {
+      break;
+    case PG_MEMCACHE_CMD_APPEND:
       func = "memcached_append";
       rc = memcached_append(globals.mc, key, key_length, value, value_length, expiration, 0);
-    }
-  else
-    {
+      break;
+    default:
       elog(ERROR, "pgmemcache: unknown set command type: %d", type);
-      return false;
     }
 
   if (rc == MEMCACHED_BUFFERED)

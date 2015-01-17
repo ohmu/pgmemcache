@@ -41,13 +41,15 @@
 void _PG_init(void);
 void _PG_fini(void);
 
-#define PG_MEMCACHE_ADD                 0x0001
-#define PG_MEMCACHE_REPLACE             0x0002
-#define PG_MEMCACHE_SET                 0x0004
-#define PG_MEMCACHE_PREPEND             0x0008
-#define PG_MEMCACHE_APPEND              0x0010
+#define PG_MEMCACHE_CMD_ADD             0x0001
+#define PG_MEMCACHE_CMD_REPLACE         0x0002
+#define PG_MEMCACHE_CMD_SET             0x0004
+#define PG_MEMCACHE_CMD_PREPEND         0x0008
+#define PG_MEMCACHE_CMD_APPEND          0x0010
+#define PG_MEMCACHE_CMD_MASK            0x00ff
 #define PG_MEMCACHE_TYPE_INTERVAL       0x0100
 #define PG_MEMCACHE_TYPE_TIMESTAMP      0x0200
+#define PG_MEMCACHE_TYPE_MASK           0x0f00
 
 Datum memcache_add(PG_FUNCTION_ARGS);
 Datum memcache_add_absexpire(PG_FUNCTION_ARGS);
