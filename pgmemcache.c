@@ -518,9 +518,6 @@ Datum memcache_get(PG_FUNCTION_ARGS)
   size_t key_length, return_value_length;
   memcached_return rc;
 
-  if (PG_ARGISNULL(0))
-    elog(ERROR, "pgmemcache: key cannot be NULL");
-
   get_key = PG_GETARG_TEXT_P(0);
 
   key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
@@ -589,9 +586,6 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
       size_t value_count;
 #endif /* USE_OMCACHE */
   } *fctx;
-
-  if (PG_ARGISNULL(0))
-    elog(ERROR, "pgmemcache: get_multi key cannot be null");
 
   array = PG_GETARG_ARRAYTYPE_P(0);
   if (ARR_NDIM(array) != 1)
@@ -785,11 +779,6 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
   text *key_text = NULL, *value_text;
   size_t key_length, value_length;
   time_t expiration = 0;
-
-  if (PG_ARGISNULL(0))
-    elog(ERROR, "pgmemcache: key cannot be NULL");
-  if (PG_ARGISNULL(1))
-    elog(ERROR, "pgmemcache: value cannot be NULL");
 
   key_text = PG_GETARG_TEXT_P(0);
   key_length = VARSIZE(key_text) - VARHDRSZ;
