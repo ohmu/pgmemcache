@@ -21,6 +21,8 @@
 
 #include "pgmemcache.h"
 
+#define KEY_MAX_LENGTH 250
+
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
@@ -35,6 +37,8 @@ static memcached_behavior get_memcached_behavior_flag(const char *flag);
 static uint64_t get_memcached_behavior_data(const char *flag, const char *data, const char **val);
 static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS);
 static memcached_return do_server_add(const char *host_str);
+const char *get_arg_cstring(text *text_field, size_t *length, bool is_key);
+
 
 /* Per-backend global state. */
 static struct memcache_global_s
@@ -386,22 +390,23 @@ Datum memcache_add_absexpire(PG_FUNCTION_ARGS)
   return memcache_set_cmd(PG_MEMCACHE_CMD_ADD | PG_MEMCACHE_TYPE_TIMESTAMP, fcinfo);
 }
 
+const char *get_arg_cstring(text *text_field, size_t *length, bool is_key)
+{
+  *length = VARSIZE(text_field) - VARHDRSZ;
+  if (is_key && *length < 1)
+    elog(ERROR, "pgmemcache: key cannot be an empty string");
+  else if (is_key && *length > KEY_MAX_LENGTH)
+    elog(ERROR, "pgmemcache: key too long, maximum is %d characters", KEY_MAX_LENGTH);
+  return VARDATA(text_field);
+}
+
 static Datum memcache_delta_op(bool increment, PG_FUNCTION_ARGS)
 {
-  text *atomic_key = PG_GETARG_TEXT_P(0);
-  char *key;
-  size_t key_length;
   uint64_t val;
   int64_t offset = 1;
   memcached_return rc;
-
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(atomic_key)));
-  key_length = strlen(key);
-
-  if (key_length < 1)
-    elog(ERROR, "pgmemcache: key cannot be an empty string");
-  if (key_length >= 250)
-    elog(ERROR, "pgmemcache: key too long");
+  size_t key_length;
+  const char *key = get_arg_cstring(PG_GETARG_TEXT_P(0), &key_length, true);
 
   if (PG_NARGS() >= 2)
     offset = PG_GETARG_INT64(1);
@@ -456,18 +461,10 @@ Datum memcache_incr(PG_FUNCTION_ARGS)
 
 Datum memcache_delete(PG_FUNCTION_ARGS)
 {
-  text *key_to_be_deleted = PG_GETARG_TEXT_P(0);
-  size_t key_length;
   time_t hold;
   memcached_return rc;
-  char *key;
-
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(key_to_be_deleted)));
-  key_length = strlen(key);
-  if (key_length < 1)
-    elog(ERROR, "pgmemcache: key cannot be an empty string");
-  if (key_length >= 250)
-    elog(ERROR, "pgmemcache: key too long");
+  size_t key_length;
+  const char *key = get_arg_cstring(PG_GETARG_TEXT_P(0), &key_length, true);
 
   hold = (time_t) 0.0;
   if (PG_NARGS() >= 2 && PG_ARGISNULL(1) == false)
@@ -506,8 +503,7 @@ Datum memcache_flush_all0(PG_FUNCTION_ARGS)
 
 Datum memcache_get(PG_FUNCTION_ARGS)
 {
-  text *get_key, *ret;
-  char *key;
+  text *ret;
 #ifdef USE_LIBMEMCACHED
   char *string;
   uint32_t flags;
@@ -515,18 +511,10 @@ Datum memcache_get(PG_FUNCTION_ARGS)
 #ifdef USE_OMCACHE
   const unsigned char *string;
 #endif /* USE_OMCACHE */
-  size_t key_length, return_value_length;
+  size_t return_value_length;
   memcached_return rc;
-
-  get_key = PG_GETARG_TEXT_P(0);
-
-  key = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(get_key)));
-  key_length = strlen(key);
-
-  if (key_length < 1)
-    elog(ERROR, "pgmemcache: key cannot be an empty string");
-  if (key_length >= 250)
-    elog(ERROR, "pgmemcache: key too long");
+  size_t key_length;
+  const char *key = get_arg_cstring(PG_GETARG_TEXT_P(0), &key_length, true);
 
 #ifdef USE_LIBMEMCACHED
   string = memcached_get(globals.mc, key, key_length, &return_value_length, &flags, &rc);
@@ -629,14 +617,9 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
         {
           int offset = array_lbound + i;
           bool isnull;
-          Datum elem;
-
-          elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
+          Datum elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
           if (!isnull)
-            {
-              keys[i] = TextDatumGetCString(PointerGetDatum(elem));
-              key_lens[i] = strlen(keys[i]);
-            }
+            keys[i] = get_arg_cstring(elem, &key_lens[i], true);
         }
       fctx->keys = keys;
       fctx->key_lens = key_lens;
@@ -775,22 +758,10 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 {
   memcached_return rc = MEMCACHED_FAILURE;
   const char *func = NULL;
-  char *key, *value;
-  text *key_text = NULL, *value_text;
-  size_t key_length, value_length;
   time_t expiration = 0;
-
-  key_text = PG_GETARG_TEXT_P(0);
-  key_length = VARSIZE(key_text) - VARHDRSZ;
-
-  /* These aren't really needed as we set libmemcached behavior to check for all invalid sets */
-  if (key_length < 1)
-    elog(ERROR, "pgmemcache: key cannot be an empty string");
-  if (key_length >= 250)
-    elog(ERROR, "pgmemcache: key too long");
-
-  value_text = PG_GETARG_TEXT_P(1);
-  value_length = VARSIZE(value_text) - VARHDRSZ;
+  size_t key_length, value_length;
+  const char *key = get_arg_cstring(PG_GETARG_TEXT_P(0), &key_length, true);
+  const char *value = get_arg_cstring(PG_GETARG_TEXT_P(1), &value_length, false);
 
   if (PG_NARGS() >= 3 && PG_ARGISNULL(2) == false)
     {
@@ -824,9 +795,6 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
           elog(ERROR, "%s():%s:%u: invalid date type", __FUNCTION__, __FILE__, __LINE__);
         }
     }
-
-  key = VARDATA(key_text);
-  value = VARDATA(value_text);
 
   switch (type & PG_MEMCACHE_CMD_MASK)
     {
@@ -868,13 +836,8 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 
 Datum memcache_server_add(PG_FUNCTION_ARGS)
 {
-  text *server = PG_GETARG_TEXT_P(0);
-  char *host_str;
-  memcached_return rc;
-
-  host_str = DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(server)));
-
-  rc = do_server_add(host_str);
+  char *host = DatumGetCString(PG_GETARG_TEXT_P(0));
+  memcached_return rc = do_server_add(host);
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: memcached_server_push: %s",
                   memcached_strerror(globals.mc, rc));
