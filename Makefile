@@ -31,11 +31,6 @@ pgmemcache.control: ext/pgmemcache.control
 pgmemcache--$(short_ver).sql: ext/pgmemcache.sql
 	cp -fp $^ $@
 
-# Build a release tarball. To make a release, adjust the
-# version number in the README, and add an entry to NEWS.
-html:
-	rst2html.py README README.html
-
 dist:
 	git archive --output=../pgmemcache_$(long_ver).tar.gz --prefix=pgmemcache/ HEAD .
 
@@ -55,7 +50,7 @@ rpm:
 	$(RM) pgmemcache-rpm-src.tar.gz
 
 build-dep:
-	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts yada flex bison libsasl2-dev
+	apt-get install libmemcached-dev postgresql-server-dev libpq-dev devscripts libsasl2-dev
 
 check-coverity:
 	$(MAKE) clean
