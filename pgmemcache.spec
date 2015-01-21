@@ -27,7 +27,7 @@ rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-%doc README NEWS LICENSE
+%doc README.rst NEWS LICENSE
 %{_libdir}/pgsql/pgmemcache.so
 %{_datadir}/pgsql/extension/pgmemcache*
 

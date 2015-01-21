@@ -45,28 +45,27 @@ It is often more convenient to specify a list of memcached servers
 to connect to in postgresql.conf, rather than calling memcache_server_add()
 in each new client connection. This can be done as follows:
 
-    1. Edit postgresql.conf
-    2. Append "pgmemcache" to shared_preload_libraries
-    3. Append "pgmemcache" to custom_variable_classes
+1. Edit postgresql.conf
+2. Append "pgmemcache" to shared_preload_libraries
+3. Append "pgmemcache" to custom_variable_classes
 
-    (Optional parts)
+(Optional parts)
 
-    4. Set the "pgmemcache.default_servers" custom GUC variable to a
-       comma-separated list of 'host:port' pairs (the port is optional).
-    5. Set the pgmemcache.default_behavior flags to suit your needs. The format is a
-       comma-separated list of memcached behavior (optional) of behavior_flag:behavior_data.
-       The flags correspond with libmemcached behavior flags. Check the libmemcached
-       documentation for those. As an example behavior you might have a line like:
+4. Set the "pgmemcache.default_servers" custom GUC variable to a
+   comma-separated list of 'host:port' pairs (the port is optional).
+5. Set the pgmemcache.default_behavior flags to suit your needs. The format is a
+   comma-separated list of memcached behavior (optional) of behavior_flag:behavior_data.
+   The flags correspond with libmemcached behavior flags. Check the libmemcached
+   documentation for those.
+   As an example behavior you might have the following line in your postgresql.conf::
 
-       pgmemcache.default_behavior='BINARY_NOREPLY:1'
+    pgmemcache.default_behavior='BINARY_NOREPLY:1'
 
-       in your postgresql.conf
+In case your system has SELinux please run::
 
-In case your system has SELinux please run:
-
-/usr/bin/checkmodule -M -m -o pgmemcache.mod pgmemcache.te
-/usr/bin/semodule_package -o pgmemcache.pp -m pgmemcache.mod
-/usr/sbin/semodule -i pgmemcache.pp
+    /usr/bin/checkmodule -M -m -o pgmemcache.mod pgmemcache.te
+    /usr/bin/semodule_package -o pgmemcache.pp -m pgmemcache.mod
+    /usr/sbin/semodule -i pgmemcache.pp
 
 USAGE:
 ======
@@ -151,52 +150,53 @@ EXAMPLES:
 =========
 
 Most installations will need a few functions to allow pgmemcache to work correctly.
-Here are a few example functions that should get most people off the ground and running:
-
-SET search_path = public;
+Here are a few example functions that should get most people off the ground and running::
+    SET search_path = public;
 
 The following function is an example of a trigger function that is used to
 replace the value of something in the cache with its new value.
 ::
 
-	CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
-	BEGIN
-		IF OLD.passwd != NEW.passwd THEN
-			PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
-		END IF;
-		RETURN NEW;
-	END;
-	$$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
+    BEGIN
+        IF OLD.passwd != NEW.passwd THEN
+            PERFORM memcache_replace('user_id_' || NEW.user_id || '_password', NEW.passwd);
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
 
-Activate the trigger for UPDATEs.
+Activate the trigger for UPDATEs::
 
-CREATE TRIGGER auth_passwd_upd_trg AFTER UPDATE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
+    CREATE TRIGGER auth_passwd_upd_trg AFTER UPDATE ON passwd
+        FOR EACH ROW EXECUTE PROCEDURE auth_passwd_upd();
 
 The above is not transaction safe, however.  A better approach is to have pgmemcache
 invalidate the cached data, but not replace it.
 ::
 
-	CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
-	BEGIN
-		IF OLD.passwd != NEW.passwd THEN
-			PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
-		END IF;
-		RETURN NEW;
-	END;
-	$$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION auth_passwd_upd() RETURNS TRIGGER AS $$
+    BEGIN
+        IF OLD.passwd != NEW.passwd THEN
+            PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
 
 Here's an example delete trigger::
 
-	CREATE OR REPLACE FUNCTION auth_passwd_del() RETURNS TRIGGER AS $$
-	BEGIN
-		PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
-		RETURN OLD;
-	END;
-	$$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION auth_passwd_del() RETURNS TRIGGER AS $$
+    BEGIN
+        PERFORM memcache_delete('user_id_' || NEW.user_id || '_password');
+        RETURN OLD;
+    END;
+    $$ LANGUAGE plpgsql;
 
-Activate the trigger for DELETEs
+Activate the trigger for DELETEs::
 
-CREATE TRIGGER auth_passwd_del_trg AFTER DELETE ON passwd FOR EACH ROW EXECUTE PROCEDURE auth_passwd_del();
+    CREATE TRIGGER auth_passwd_del_trg AFTER DELETE ON passwd
+        FOR EACH ROW EXECUTE PROCEDURE auth_passwd_del();
 
 LICENSE:
 ========
