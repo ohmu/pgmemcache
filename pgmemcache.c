@@ -550,28 +550,29 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   ArrayType *array;
   int array_length, array_lbound, i;
   Oid element_type;
-#ifdef USE_LIBMEMCACHED
-  uint32_t flags;
-#endif /* USE_LIBMEMCACHED */
   memcached_return rc;
   char typalign;
   int16 typlen;
   bool typbyval;
-#ifdef USE_OMCACHE
-  const unsigned
-#endif /* USE_OMCACHE */
+#ifdef USE_LIBMEMCACHED
+  uint32_t flags;
   char *current_key, *current_val;
+#endif /* USE_LIBMEMCACHED */
+#ifdef USE_OMCACHE
+  const unsigned char *current_key, *current_val;
+#endif /* USE_OMCACHE */
   size_t current_key_len, current_val_len;
-  char **keys;
-  size_t *key_lens;
   FuncCallContext *funcctx;
   MemoryContext oldcontext;
   TupleDesc tupdesc;
   AttInMetadata *attinmeta;
   struct internal_fctx {
-      char **keys;
       size_t *key_lens;
+#ifdef USE_LIBMEMCACHED
+      const char **keys;
+#endif /* USE_LIBMEMCACHED */
 #ifdef USE_OMCACHE
+      const unsigned char **keys;
       omcache_req_t *requests;
       size_t request_count;
       omcache_value_t *values;
@@ -598,24 +599,36 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
         ereport(ERROR,
                 (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("function returning record called in context that cannot accept type record")));
-      fctx = (struct internal_fctx *) palloc(sizeof(*fctx));
-
       get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
 
-      keys = palloc(sizeof(char *) * (array_length + 1 /* extra key for last memcached_fetch call */ ));
-      key_lens = palloc(sizeof(size_t) * (array_length + 1));
+      fctx = (struct internal_fctx *) palloc(sizeof(*fctx));
+      /* extra NULL key for last memcached_fetch call */
+      fctx->keys = palloc(sizeof(char *) * (array_length + 1));
+      fctx->key_lens = palloc(sizeof(size_t) * (array_length + 1));
+      fctx->keys[array_length] = 0;
+      fctx->key_lens[array_length] = 0;
 
-      /* initialize terminating extra-key */
-      keys[array_length] = 0;
-      key_lens[array_length] = 0;
+#ifdef USE_LIBMEMCACHED
+      for (i = 0; i < array_length; i++)
+        {
+          int offset = array_lbound + i;
+          bool isnull;
+          Datum elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
+          if (!isnull)
+            fctx->keys[i] = get_arg_cstring(DatumGetTextP(elem), &fctx->key_lens[i], true);
+        }
 
+      rc = memcached_mget(globals.mc, fctx->keys, fctx->key_lens, array_length);
+      if (rc != MEMCACHED_SUCCESS)
+        elog(ERROR, "pgmemcache: memcached_mget: %s",
+                    memcached_strerror(globals.mc, rc));
+#endif /* USE_LIBMEMCACHED */
 #ifdef USE_OMCACHE
       /* persistent request structures to handle pending requests */
       fctx->requests = palloc(sizeof(omcache_req_t) * array_length);
       fctx->request_count = array_length;
       fctx->values = palloc(sizeof(omcache_value_t) * array_length);
       fctx->value_count = array_length;
-#endif /* USE_OMCACHE */
 
       for (i = 0; i < array_length; i++)
         {
@@ -623,27 +636,16 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
           bool isnull;
           Datum elem = array_ref(array, 1, &offset, 0, typlen, typbyval, typalign, &isnull);
           if (!isnull)
-            keys[i] = get_arg_cstring(elem, &key_lens[i], true);
+            fctx->keys[i] = (const unsigned char *)
+              get_arg_cstring(DatumGetTextP(elem), &fctx->key_lens[i], true);
         }
-      fctx->keys = keys;
-      fctx->key_lens = key_lens;
 
-#ifdef USE_LIBMEMCACHED
-      rc = memcached_mget(globals.mc, (const char **) keys, key_lens, array_length);
-      if (rc != MEMCACHED_SUCCESS)
-        elog(ERROR, "pgmemcache: memcached_mget: %s",
-                    memcached_strerror(globals.mc, rc));
-#endif /* USE_LIBMEMCACHED */
-#ifdef USE_OMCACHE
-      rc = omcache_get_multi(globals.mc, (const unsigned char **) keys, key_lens, array_length,
+      rc = omcache_get_multi(globals.mc, fctx->keys, fctx->key_lens, array_length,
                              fctx->requests, &fctx->request_count, fctx->values, &fctx->value_count,
                              OMCACHE_READ_TIMEOUT);
       if (rc != OMCACHE_OK && rc != OMCACHE_AGAIN)
         elog(ERROR, "pgmemcache: omcache_get_multi: %s", omcache_strerror(rc));
 #endif /* USE_OMCACHE */
-
-      if (rc == MEMCACHED_NOTFOUND)
-        PG_RETURN_NULL();
 
       attinmeta = TupleDescGetAttInMetadata(tupdesc);
       funcctx->attinmeta = attinmeta;
@@ -656,7 +658,7 @@ Datum memcache_get_multi(PG_FUNCTION_ARGS)
   attinmeta = funcctx->attinmeta;
 
 #ifdef USE_LIBMEMCACHED
-  current_key = fctx->keys[funcctx->call_cntr];
+  current_key = (char *) fctx->keys[funcctx->call_cntr];  // cast away constness for libmemcached api
   current_key_len = fctx->key_lens[funcctx->call_cntr];
   current_val = memcached_fetch(globals.mc, current_key, &current_key_len, &current_val_len, &flags, &rc);
   if (rc == MEMCACHED_END)
