@@ -162,8 +162,12 @@ static time_t interval_to_time_t(Interval *span)
 /* called at end of transaction, flush all buffers to memcache */
 static void pgmemcache_xact_callback(XactEvent event, void *arg)
 {
-  if ((event == XACT_EVENT_COMMIT || event == XACT_EVENT_PRE_COMMIT) &&
-      globals.flush_on_commit && globals.flush_needed)
+  if (globals.flush_on_commit && globals.flush_needed &&
+      (event == XACT_EVENT_COMMIT
+#if defined(PG_VERSION_NUM) && (PG_VERSION_NUM >= 90300)
+      || event == XACT_EVENT_PRE_COMMIT
+#endif /* PG_VERSION_NUM >= 90300 */
+      ))
     {
 #ifdef USE_LIBMEMCACHED
       memcached_return rc = memcached_flush_buffers(globals.mc);
