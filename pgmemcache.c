@@ -842,7 +842,9 @@ static Datum memcache_set_cmd(int type, PG_FUNCTION_ARGS)
 
 Datum memcache_server_add(PG_FUNCTION_ARGS)
 {
-  char *host = DatumGetCString(PG_GETARG_TEXT_P(0));
+  size_t host_len;
+  const char *host_buf = get_arg_cstring(PG_GETARG_TEXT_P(0), &host_len, false);
+  char *host = pnstrdup(host_buf, host_len);
   memcached_return rc = do_server_add(host);
   if (rc != MEMCACHED_SUCCESS)
     elog(WARNING, "pgmemcache: memcached_server_push: %s",

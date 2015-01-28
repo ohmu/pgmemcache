@@ -8,7 +8,6 @@ SELECT memcache_server_add('localhost:33211');
 SELECT regexp_replace(memcache_stats(), 'pid:.*', '') AS memcache_stats;
       memcache_stats       
 ---------------------------
-                          +
  Server: localhost (33211)+
  
 (1 row)
