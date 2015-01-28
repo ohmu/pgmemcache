@@ -1,5 +1,8 @@
-pgmemcache
-==========
+pgmemcache |BuildStatus|_
+=========================
+
+.. |BuildStatus| image:: https://travis-ci.org/ohmu/pgmemcache.png?branch=master
+.. _BuildStatus: https://travis-ci.org/ohmu/pgmemcache
 
 pgmemcache is a set of PostgreSQL user-defined functions that provide an
 interface to memcached.  Installing pgmemcache is easy, but does have a few

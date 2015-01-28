@@ -1,0 +1,15 @@
+language: c
+compiler: gcc
+
+addons:
+  postgresql: "9.1"
+
+install:
+  - sudo apt-get install postgresql-server-dev-9.1 memcached
+
+script:
+  - make
+  - ./localtests.sh
+
+after_failure:
+  - cat regressiondata/regression.diffs
