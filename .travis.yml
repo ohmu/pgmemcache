@@ -1,15 +1,19 @@
 language: c
 compiler: gcc
 
-addons:
-  postgresql: "9.1"
-
 install:
-  - sudo apt-get install postgresql-server-dev-9.1 memcached
+  - sudo apt-get install memcached postgresql-server-dev-9.1 postgresql-server-dev-9.2 postgresql-server-dev-9.3
 
 script:
-  - make
-  - ./localtests.sh
+  - make clean
+  - make PG_CONFIG=/usr/lib/postgresql/9.1/bin/pg_config
+  - PATH=/usr/lib/postgresql/9.1/bin/:$PATH ./localtests.sh
+  - make clean
+  - make PG_CONFIG=/usr/lib/postgresql/9.2/bin/pg_config
+  - PATH=/usr/lib/postgresql/9.2/bin/:$PATH ./localtests.sh
+  - make clean
+  - make PG_CONFIG=/usr/lib/postgresql/9.3/bin/pg_config
+  - PATH=/usr/lib/postgresql/9.3/bin/:$PATH ./localtests.sh
 
 after_failure:
   - cat regressiondata/regression.diffs

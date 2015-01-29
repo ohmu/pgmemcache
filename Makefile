@@ -21,7 +21,7 @@ SHLIB_LINK = -lmemcached -lsasl2
 PG_CPPFLAGS += -DUSE_LIBMEMCACHED
 endif
 
-PG_CONFIG = pg_config
+PG_CONFIG ?= pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
