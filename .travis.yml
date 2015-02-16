@@ -2,18 +2,18 @@ language: c
 compiler: gcc
 
 install:
-  - sudo apt-get install memcached postgresql-server-dev-9.1 postgresql-server-dev-9.2 postgresql-server-dev-9.3
+  - sudo apt-get update
+  - sudo apt-get install memcached postgresql-server-dev-$PGVER
 
 script:
   - make clean
-  - make PG_CONFIG=/usr/lib/postgresql/9.1/bin/pg_config
-  - PATH=/usr/lib/postgresql/9.1/bin/:$PATH ./localtests.sh
-  - make clean
-  - make PG_CONFIG=/usr/lib/postgresql/9.2/bin/pg_config
-  - PATH=/usr/lib/postgresql/9.2/bin/:$PATH ./localtests.sh
-  - make clean
-  - make PG_CONFIG=/usr/lib/postgresql/9.3/bin/pg_config
-  - PATH=/usr/lib/postgresql/9.3/bin/:$PATH ./localtests.sh
+  - make PG_CONFIG=/usr/lib/postgresql/$PGVER/bin/pg_config
+  - PATH=/usr/lib/postgresql/$PGVER/bin/:$PATH ./localtests.sh
 
 after_failure:
   - cat regressiondata/regression.diffs
+
+env:
+  - PGVER=9.1
+  - PGVER=9.2
+  - PGVER=9.3
