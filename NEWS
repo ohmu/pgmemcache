@@ -1,6 +1,11 @@
-pgmemcache DEV
-==============
+pgmemcache 2.3.0 (2015-02-16)
+=============================
 
+* Preliminary support for using OMcache instead of libmemcached for
+  communicating with memcached servers
+* Continuous integration at travis-ci.org
+* Consistent and fixed text argument handling
+* Fix behavior parsing to compare full behavior names instead of prefixes
 * Flush client buffers to memcache servers on commit if the new GUC
   pgmemcache.flush_on_commit is enabled, otherwise some buffers may get
   lost when the PostgreSQL backend terminates before everything has been
@@ -9,8 +14,8 @@ pgmemcache DEV
   indicate that we don't really know the result of the action, but it wasn't
   an error
 
-pgmemcache 2.2.0
-================
+pgmemcache 2.2.0 (2014-09-09)
+=============================
 
 * Support for MEMCACHED_BEHAVIOR_DEAD_TIMEOUT with libmemcached >= 1.0.3
 * Changing default_servers now drops old servers from the list
@@ -19,24 +24,24 @@ pgmemcache 2.2.0
 * Use pg_regress for make installcheck testing (Christoph Berg)
 * Fix memory allocation (Mika Eloranta, Oskari Saarenmaa)
 
-pgmemcache 2.1.2
-================
+pgmemcache 2.1.2 (2013-11-12)
+=============================
 
 * memcache_get_multi crash fixes (Maxim Kuzevanov)
 * RPM packaging support
 * Fix versioning when building without git (reported by Patryk Kordylewski)
 * Code refactoring with minor fixes and consistent indentation and style
 
-pgmemcache 2.1.1
-================
+pgmemcache 2.1.1 (2013-05-15)
+=============================
 
 * Fix errors and warnings exposed by GCC 4.8
 * Make the memcache binary protocol the default
 * Change memcache_incr and memcache_decr to use BIGINT arguments for the
   increment/decrement values (patch from Markus Holmberg / F-Secure)
 
-pgmemcache 2.1.0
-================
+pgmemcache 2.1.0 (2013-04-22)
+=============================
 
 * CREATE EXTENSION support
 * PostgreSQL 9.2 support
@@ -48,14 +53,14 @@ pgmemcache 2.1.0
 * Compatibility with newer libmemcached versions
 * Updated Debian packaging scripts
 
-pgmemcache 2.0.6
-================
+pgmemcache 2.0.6 (2011-04-25)
+=============================
 
 * Fix building on earlier releases than 9.1 (reported by Florian Von Block)
 * Add libsasl2-dev to build deps
 
-pgmemcache 2.0.5
-================
+pgmemcache 2.0.5 (2011-04-24)
+=============================
 
 * Some preliminary work on SASL support
 * Make pgmemcache work with PG 9.1

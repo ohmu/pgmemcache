@@ -1,4 +1,4 @@
-short_ver = 2.2.0
+short_ver = 2.3.0
 long_ver = $(shell git describe --long 2>/dev/null || echo $(short_ver)-0-unknown)
 
 MODULE_big = pgmemcache
@@ -10,7 +10,8 @@ DATA =	ext/pgmemcache--unpackaged--2.0.sql \
 	ext/pgmemcache--2.0--2.1.sql \
 	ext/pgmemcache--2.1--2.1.1.sql \
 	ext/pgmemcache--2.1.1--2.1.2.sql \
-	ext/pgmemcache--2.1.2--2.2.0.sql
+	ext/pgmemcache--2.1.2--2.2.0.sql \
+	ext/pgmemcache--2.2.0--2.3.0.sql
 REGRESS = init start_memcached test stop_memcached
 
 ifeq ($(USE_OMCACHE),1)
