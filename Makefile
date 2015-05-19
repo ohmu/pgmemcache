@@ -45,6 +45,7 @@ deb%:
 rpm:
 	git archive --output=pgmemcache-rpm-src.tar.gz --prefix=pgmemcache/ HEAD
 	rpmbuild -ta pgmemcache-rpm-src.tar.gz \
+		--define 'rpm_name_suffix $(rpm_name_suffix)' \
 		--define 'full_version $(long_ver)' \
 		--define 'major_version $(short_ver)' \
 		--define 'minor_version $(subst -,.,$(subst $(short_ver)-,,$(long_ver)))'
