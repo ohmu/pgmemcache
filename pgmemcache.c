@@ -11,7 +11,14 @@
  */
 
 #ifdef USE_OMCACHE
+#ifndef OMCACHE_READ_TIMEOUT
 #define OMCACHE_READ_TIMEOUT 2000
+#endif // !OMCACHE_READ_TIMEOUT
+#define MEMCACHED_READ_TIMEOUT OMCACHE_READ_TIMEOUT
+#ifndef OMCACHE_WRITE_TIMEOUT
+#define OMCACHE_WRITE_TIMEOUT 20
+#endif // !OMCACHE_WRITE_TIMEOUT
+#define MEMCACHED_WRITE_TIMEOUT OMCACHE_WRITE_TIMEOUT
 #include "omcache_libmemcached.h"
 #include <syslog.h>  /* for log levels */
 #endif /* USE_OMCACHE */
