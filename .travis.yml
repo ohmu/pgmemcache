@@ -14,6 +14,7 @@ after_failure:
   - cat regressiondata/regression.diffs
 
 env:
-  - PGVER=9.1
   - PGVER=9.2
   - PGVER=9.3
+  - PGVER=9.4
+  - PGVER=9.5
