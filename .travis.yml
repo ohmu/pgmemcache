@@ -3,7 +3,7 @@ compiler: gcc
 
 install:
   - sudo apt-get update
-  - sudo apt-get install memcached postgresql-server-dev-$PGVER
+  - sudo apt-get install memcached postgresql-$PGVER postgresql-server-dev-$PGVER
 
 script:
   - make clean
