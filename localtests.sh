@@ -16,7 +16,7 @@ sed -e "s%^#port =.*%port = $PGPORT%" \
     -e "s%^#fsync = .*%fsync = off%" \
     -e "s%^#synchronous_commit = .*%synchronous_commit = off%" \
     -i "$PGDATA/postgresql.conf"
-pg_ctl -l "$PGDATA/log" start
+pg_ctl -l "$PGDATA/logfile" start
 while [ ! -S "$PGDATA/.s.PGSQL.$PGPORT" ]; do sleep 2; done
 trap "pg_ctl stop -m immediate" EXIT
 
